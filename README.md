@@ -35,4 +35,6 @@ indication stat : calculer les sensibilité et specificité
 
 ## To do : 
 
-
+function qui cree le model
+function qui calcule specificité et sensibilité
+function qui test la vraisemblance
