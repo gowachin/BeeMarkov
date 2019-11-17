@@ -108,15 +108,19 @@ control <- function(file, # fichier
   } else {
     # need to downscale one model
     l_order <- order(c(l_word_pos,l_word_neg) )
-    if(diff(l_order)>0){
-      # print("l_word_neg > l_word_pos")
-      trans_pos <-transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type ="+")
-      trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-", l_need = l_word_pos)
-    }else{
-      # print("l_word_neg < l_word_pos")
-      trans_pos <-transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type ="+", l_need = l_word_neg)
-      trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-")
-    }
+    # if(diff(l_order)>0){
+    #   # print("l_word_neg > l_word_pos")
+    #   trans_pos <-transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type ="+")
+    #   trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-", l_need = l_word_pos)
+    # }else{
+    #   # print("l_word_neg < l_word_pos")
+    #   trans_pos <-transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type ="+", l_need = l_word_neg)
+    #   trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-")
+    # }
+    
+    # in fact, need to downscale every model
+    trans_pos <-transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type ="+", l_need = 1)
+    trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-", l_need = 1)
   }
   
   seq <- read.fasta(file)
@@ -163,14 +167,14 @@ control <- function(file, # fichier
   return(tmp)
 }
 
-control(file = "raw_data/mus_cpg_test.fa", # fichier
-        pos_training = "raw_data/mus_cpg_app.fa", # file to train with
-        neg_training = "raw_data/mus_tem_app.fa", # file to train with
-        l_word_pos = 1, # transition table positif
-        l_word_neg = 2, # transition table negatif
-        n_train = 1160, # number of sequences to train with
-        n_seq = 1163 # number of sequences to analyse
-)
+# control(file = "raw_data/mus_cpg_test.fa", # fichier
+#         pos_training = "raw_data/mus_cpg_app.fa", # file to train with
+#         neg_training = "raw_data/mus_tem_app.fa", # file to train with
+#         l_word_pos = 2, # transition table positif
+#         l_word_neg = 4, # transition table negatif
+#         n_train = 1160, # number of sequences to train with
+#         n_seq = 1163 # number of sequences to analyse
+# )
 
 assembly <- function(pos_test, # fichier
                      neg_test,
@@ -218,23 +222,37 @@ assembly <- function(pos_test, # fichier
     }
   }
   
-  colnames(sensi) <- colnames(speci) <- neg_seq
-  rownames(sensi) <- rownames(speci) <- pos_seq
+  colnames(sensi) <- colnames(speci) <- paste("-",neg_seq, sep="")
+  rownames(sensi) <- rownames(speci) <- paste("+",pos_seq, sep="")
   
   final <-list(sensi,speci) ; names(final) = c("sensi","speci")
   
   return(final)
 }
-# doit merdouiller ici, a voir ####
+
 final = assembly("raw_data/mus_cpg_test.fa", # fichier
          "raw_data/mus_tem_test.fa",
          "raw_data/mus_cpg_app.fa", # file to train with for positive
          "raw_data/mus_tem_app.fa", # file to train with for negative
-         pos_seq = c(1:2),
-         neg_seq = c(1:2),
+         pos_seq = c(1:6),
+         neg_seq = c(1:6),
          n_train = 1160, # number of sequences to train with
          n_seq = 1163 # number of sequences to analyse
 )
+txt = "Computation has ended"
+GET(paste('https://smsapi.free-mobile.fr/sendmsg?user=17267063&pass=CDZDEAQ49d1q3X&msg=%',
+          paste(as.character(charToRaw(txt)), collapse = "%"), sep = ""))
+
+# ça ne marche pas pour les couples où le minimum > 1 avec projet de base
+# tout redescendua 1 pour avoir des resultats...a voir si d'un point de vue mathématique ça colle
+final
+
+library(reshape)
+
+table = cbind(melt(final$sensi), melt(final$speci)[,3])
+colnames(table) = c("M+","M-","Sensi","Speci")
+
+library(ggplot2)
 
 
 
