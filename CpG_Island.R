@@ -250,12 +250,13 @@ final
 library(reshape)
 
 table = cbind(melt(final$sensi), melt(final$speci)[,3])
-colnames(table) = c("M+","M-","Sensi","Speci")
+colnames(table) = c("M","m","Sensi","Speci")
 
 library(ggplot2)
 
-
-
+ggplot(table, aes(M,m)) +
+  geom_raster(aes(fill = Sensi), hjust=0.5, vjust=0.5, interpolate=FALSE) +
+  geom_contour(aes(z = Sensi))  
 
 # # scrap ####
 # test = count(cpg_A1,2)
@@ -266,26 +267,26 @@ library(ggplot2)
 
 
 # time control ####
-try = 6
-l_word = try
-n_seq = 1160 
-seq <- cpg_A
-Nseq <- length(seq)
-
-v1 = function(){
-test <-count(cpg_A[[1]], l_word)
-l_count = function(seq,n = try){count(seq,n)}
-test = rowSums(sapply(cpg_A,l_count) )
-test = test / sum(test)
-}
-
-v2 = function(){
-  tmp <-count(seq[[1]], l_word)
-  for(i in 2:n_seq){
-    tmp <- tmp + count(seq[[i]], l_word)
-  }
-tmp / sum(tmp)
-}
-
-system.time(v1())
-system.time(v2())
+# try = 6
+# l_word = try
+# n_seq = 1160 
+# seq <- cpg_A
+# Nseq <- length(seq)
+# 
+# v1 = function(){
+# test <-count(cpg_A[[1]], l_word)
+# l_count = function(seq,n = try){count(seq,n)}
+# test = rowSums(sapply(cpg_A,l_count) )
+# test = test / sum(test)
+# }
+# 
+# v2 = function(){
+#   tmp <-count(seq[[1]], l_word)
+#   for(i in 2:n_seq){
+#     tmp <- tmp + count(seq[[i]], l_word)
+#   }
+# tmp / sum(tmp)
+# }
+# 
+# system.time(v1())
+# system.time(v2())
