@@ -186,6 +186,11 @@ assembly <- function(pos_test, # fichier
                      n_seq = 1 # number of sequences to analyse
 ){
   
+  choix = menu(c("yes","no"),
+               title = "You will launch long computation, do you wish to procede further ?")
+  if (choix ==1) cat("\n      ============ Go take a good coffee ============       \n\n")
+  if (choix ==2) stop("You stopped the computations")
+  
   sensi <- speci <- matrix(rep(0,length(pos_seq)*length(neg_seq)),ncol = length(pos_seq),nrow = length(neg_seq))
   
   for(i in 1:length(pos_seq)){
@@ -230,15 +235,18 @@ assembly <- function(pos_test, # fichier
   return(final)
 }
 
-final = assembly("raw_data/mus_cpg_test.fa", # fichier
+
+# takes long, warning
+cpg_fin = assembly("raw_data/mus_cpg_test.fa", # fichier
          "raw_data/mus_tem_test.fa",
          "raw_data/mus_cpg_app.fa", # file to train with for positive
          "raw_data/mus_tem_app.fa", # file to train with for negative
-         pos_seq = c(1:6),
-         neg_seq = c(1:6),
+         pos_seq = c(1:7),
+         neg_seq = c(1:7),
          n_train = 1160, # number of sequences to train with
          n_seq = 1163 # number of sequences to analyse
 )
+
 txt = "Computation has ended"
 GET(paste('https://smsapi.free-mobile.fr/sendmsg?user=17267063&pass=CDZDEAQ49d1q3X&msg=%',
           paste(as.character(charToRaw(txt)), collapse = "%"), sep = ""))
@@ -249,14 +257,74 @@ final
 
 library(reshape)
 
-table = cbind(melt(final$sensi), melt(final$speci)[,3])
+table = cbind(melt(cpg_fin$sensi), melt(cpg_fin$speci)[,3])
 colnames(table) = c("M","m","Sensi","Speci")
+table$tot = table$Sensi+table$Speci
 
 library(ggplot2)
 
 ggplot(table, aes(M,m)) +
-  geom_raster(aes(fill = Sensi), hjust=0.5, vjust=0.5, interpolate=FALSE) +
-  geom_contour(aes(z = Sensi))  
+  geom_raster(aes(fill = tot), hjust=0.5, vjust=0.5, interpolate=FALSE) +
+  geom_contour(aes(z = tot))  
+
+table[which(table$tot == max(table$tot)),]
+
+# viterbi ####
+viterbi <- function(file = "raw_data/mus1.fa",
+                    pos_training = "raw_data/mus_cpg_app.fa", # file to train with for positive
+                    neg_training = "raw_data/mus_tem_app.fa", # file to train with for negative
+                    l_word_pos = 2,
+                    l_word_neg = 1,
+                    n_train = 1160,
+                    n_ana = 1,
+                    l_c = 1000, # length coding
+                    l_nc = 125000 # length non-coding
+                    ) {
+  if(l_word_pos == l_word_neg){
+    trans_pos <-transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type ="+")
+    trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-")
+  } else {
+    # need to downscale one model
+    l_order <- order(c(l_word_pos,l_word_neg) )
+    
+    trans_pos <-transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type ="+", l_need = 1)
+    trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-", l_need = 1)
+  }
+  
+  seq <- read.fasta(file)
+  if(n_ana > 1) stop('Analysis for multiple files is not implemented yet')
+  
+  raw_seq <- seq[[1]]
+  long <- length(raw_seq)
+  
+  beg <- max(l_word_pos,l_word_neg)
+  
+  proba <- matrix(rep(NA,long*3),ncol = 3) ; colnames(proba) <- c("M+","M-")
+  
+  proba[1:l_word_pos-1,1] = 0
+  proba[1:l_word_pos-1,2] = 0
+  # head(proba)
+  
+  cat('      ============ Viterbi is running ============       \n')
+  pb <- txtProgressBar(min = beg, max = long, style = 3)
+  for(i in beg:long){
+    setTxtProgressBar(pb, i)
+    # # proba d'avoir la base sous M
+    # pM <- min( count(raw_seq[(i-l_word_pos+1):i], l_word_pos) * trans_pos)
+    # 
+    # # proba d'avoir la base sous M
+    # pm <- min(count(raw_seq[(i-l_word_neg+1):i], l_word_neg) * trans_neg)
+    # 
+    # proba[i,1] = pM
+    # proba[i,2] = pm
+    if(proba[i,1]>proba[i,2]) {proba[i,3]=2} else {proba[i,3]=3}
+  }
+  close(pb)
+
+  # head(proba)
+}
+
+plot(x = 1:long, y = rep(1,long), col = proba[,3])
 
 # # scrap ####
 # test = count(cpg_A1,2)

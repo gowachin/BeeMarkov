@@ -11,7 +11,7 @@
                                  "\n\n")
                                , collapse = " "))
 
-pack = c("beepr","seqinr") #ajouter des packages par default
+pack = c("beepr","seqinr","httr") #ajouter des packages par default
 
 options(defaultPackages=c(getOption("defaultPackages"),
                           pack)) 
