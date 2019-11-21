@@ -35,7 +35,9 @@ transition <- function(file, # fichier
     }else if(l_need == l_word){
       l_need = NULL
       warning("l_need is equal than l_word, therefore there is no downscale here")
-    }
+    }else if(l_need < 1){
+      l_need = NULL
+      warning("l_need is inferior to 1, therefore there is no downscale here")
   }
 
   tmp <- count(seq[[1]], l_word) + 1 # add 1 occurence to have at least 1 obs
@@ -83,8 +85,8 @@ transition <- function(file, # fichier
   # print(tmp)
   return(tmp)
 }
-# mP <-transition(file = "raw_data/mus_cpg_app.fa", n_seq = 1160, l_word = 2, log = F)
-# mM <- transition(file = "raw_data/mus_tem_app.fa", n_seq = 1160, l_word = 1, log = F)
+#  mP <-transition(file = "raw_data/mus_cpg_app.fa", n_seq = 1160, l_word = 3, log = F, l_need = 2)
+#  mM <- transition(file = "raw_data/mus_cpg_app.fa", n_seq = 1160, l_word = 1, log = F)
 # 
 # mP ; mM
 # 
@@ -106,8 +108,8 @@ control <- function(file, # fichier
     trans_pos <-transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type ="+")
     trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-")
   } else {
-    # need to downscale one model
-    l_order <- order(c(l_word_pos,l_word_neg) )
+    # # need to downscale one model
+    # l_order <- order(c(l_word_pos,l_word_neg) )
     # if(diff(l_order)>0){
     #   # print("l_word_neg > l_word_pos")
     #   trans_pos <-transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type ="+")
@@ -118,9 +120,9 @@ control <- function(file, # fichier
     #   trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-")
     # }
     
-    # in fact, need to downscale every model
-    trans_pos <-transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type ="+", l_need = 1)
-    trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-", l_need = 1)
+    # in fact, need to downscale every model, but just to l_word_pos -1
+    trans_pos <-transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type ="+", l_need = l_word_pos-1)
+    trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-", l_need = l_word_neg-1)
   }
   
   seq <- read.fasta(file)
@@ -235,14 +237,13 @@ assembly <- function(pos_test, # fichier
   return(final)
 }
 
-
 # takes long, warning
 cpg_fin = assembly("raw_data/mus_cpg_test.fa", # fichier
          "raw_data/mus_tem_test.fa",
          "raw_data/mus_cpg_app.fa", # file to train with for positive
          "raw_data/mus_tem_app.fa", # file to train with for negative
-         pos_seq = c(1:7),
-         neg_seq = c(1:7),
+         pos_seq = c(1:5),
+         neg_seq = c(1:5),
          n_train = 1160, # number of sequences to train with
          n_seq = 1163 # number of sequences to analyse
 )
@@ -253,7 +254,7 @@ GET(paste('https://smsapi.free-mobile.fr/sendmsg?user=17267063&pass=CDZDEAQ49d1q
 
 # ça ne marche pas pour les couples où le minimum > 1 avec projet de base
 # tout redescendua 1 pour avoir des resultats...a voir si d'un point de vue mathématique ça colle
-final
+final = cpg_fin
 
 library(reshape)
 
@@ -299,32 +300,75 @@ viterbi <- function(file = "raw_data/mus1.fa",
   
   beg <- max(l_word_pos,l_word_neg)
   
-  proba <- matrix(rep(NA,long*3),ncol = 3) ; colnames(proba) <- c("M+","M-")
+  proba <- matrix(rep(NA,long*3),ncol = 3) ; colnames(proba) <- c("M+","M-","model")
   
-  proba[1:l_word_pos-1,1] = 0
-  proba[1:l_word_pos-1,2] = 0
+  # compute p_initial from l_c and l_nc
+  pos_init <- neg_init <- log(0.5)
+  
+  # initialisation
+  proba[beg,1] <- min(count(raw_seq[(beg-l_word_pos+1):beg], l_word_pos) * trans_pos) + pos_init
+  proba[beg,2] <- min(count(raw_seq[(beg-l_word_neg+1):beg], l_word_neg) * trans_neg) + neg_init
+  
+  # base before initialisation...what to put??? ####
+  proba[1:beg-1,1] <- -42
+  proba[1:beg-1,2] <- -42
+  
   # head(proba)
   
+  trans_mod <- log(matrix(c(0.8,0.8,
+                            0.2,0.2)
+                          ,ncol = 2,nrow = 2))
+  colnames(trans_mod) <- rownames(trans_mod) <- c("c","nc")
+  trans_mod
+  
+  # long = 50000
+  
+  beg <- beg + 1
   cat('      ============ Viterbi is running ============       \n')
   pb <- txtProgressBar(min = beg, max = long, style = 3)
   for(i in beg:long){
     setTxtProgressBar(pb, i)
-    # # proba d'avoir la base sous M
-    # pM <- min( count(raw_seq[(i-l_word_pos+1):i], l_word_pos) * trans_pos)
-    # 
-    # # proba d'avoir la base sous M
-    # pm <- min(count(raw_seq[(i-l_word_neg+1):i], l_word_neg) * trans_neg)
-    # 
-    # proba[i,1] = pM
-    # proba[i,2] = pm
+    
+    # proba d'avoir la base sous M
+    pM <- max( min(count(raw_seq[(i-l_word_pos+1):i], l_word_pos) * trans_pos) + trans_mod[1,1],
+               min(count(raw_seq[(i-l_word_neg+1):i], l_word_neg) * trans_neg) + trans_mod[2,1])
+
+    # proba d'avoir la base sous m
+    pm <- max( min(count(raw_seq[(i-l_word_neg+1):i], l_word_neg) * trans_neg) + trans_mod[2,2],
+               min(count(raw_seq[(i-l_word_pos+1):i], l_word_pos) * trans_pos) + trans_mod[1,2])
+
+    proba[i,1] <- pM
+    proba[i,2] <- pm
     if(proba[i,1]>proba[i,2]) {proba[i,3]=2} else {proba[i,3]=3}
   }
   close(pb)
+  
+  # cat('      ============ Viterbi is running backward ============       \n')
+  # pb <- txtProgressBar(min = beg, max = long, style = 3) ; j = beg
+  # for(i in long:beg){
+  #   j <- j +1 ; setTxtProgressBar(pb, j)
+  #   
+  #   if(proba[i,1]>proba[i,2]) {proba[i,3]=2} else {proba[i,3]=3}
+  #   
+  #   # # proba d'avoir la base sous M
+  #   # pM <- max( min(count(raw_seq[(i-l_word_pos+1):i], l_word_pos) * trans_pos) + trans_mod[1,1],
+  #   #            min(count(raw_seq[(i-l_word_neg+1):i], l_word_neg) * trans_neg) + trans_mod[2,1])
+  #   # 
+  #   # # proba d'avoir la base sous m
+  #   # pm <- max( min(count(raw_seq[(i-l_word_neg+1):i], l_word_neg) * trans_neg) + trans_mod[2,2],
+  #   #            min(count(raw_seq[(i-l_word_pos+1):i], l_word_pos) * trans_pos) + trans_mod[1,2])
+  #   # 
+  #   # proba[i,1] <- pM
+  #   # proba[i,2] <- pm
+  #   # if(proba[i,1]>proba[i,2]) {proba[i,3]=2} else {proba[i,3]=3}
+  # }
+  # close(pb)
 
-  # head(proba)
+  head(proba)
 }
 
-plot(x = 1:long, y = rep(1,long), col = proba[,3])
+long = 100
+plot(x = 1:100, y = rep(1,long), col = proba[,3])
 
 # # scrap ####
 # test = count(cpg_A1,2)
@@ -332,7 +376,6 @@ plot(x = 1:long, y = rep(1,long), col = proba[,3])
 # # il crée bien la matrice comme il faut avec count
 # titres = matrix(names(test), ncol = 4)
 # titres
-
 
 # time control ####
 # try = 6
