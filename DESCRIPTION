@@ -1,16 +1,17 @@
-Package: Template
+Package: BeeMarkov
 Type: Package
 Title: What the Package Does (Title Case)
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
+Author: Maxime Jaunatre
+Maintainer:  <maxime.jaunatre@etu.univ-grenoble-alpes.fr>
+Description: Work produced in UGA for modelisation course.
     Use four spaces when indenting paragraphs within the Description.
 License: What license is it under?
 Encoding: UTF-8
 LazyData: true
 Imports: graphics,
-         R.utils
+         R.utils,
+         seqinr
 RoxygenNote: 6.1.1
 Depends: R (>= 2.10)
 Suggests: 

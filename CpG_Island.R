@@ -2,22 +2,24 @@
 # library(seqinr)
 
 # Lecture d’un fichier fasta :
-# cpg_A=read.fasta(file= "raw_data/mus_cpg_app.fa")
-# tem_A=read.fasta(file= "raw_data/mus_tem_app.fa")
-# Donne le nombre de séquences dans le fichier
+# cpg_A=seqinr::read.fasta(file= "raw_data/mus_cpg_app.fa")
+# tem_A=seqinr::read.fasta(file= "raw_data/mus_tem_app.fa")
+# Donne le nombre de sequences dans le fichier
 # length(cpg_A)
-# Extraction de la première séquence du fichier
+# Extraction de la premiere sequence du fichier
 # cpg_A1=cpg_A[[1]]
-# Fonction compte : count the words with a certain number of letter
-# count(cpg_A1,3)
+# Fonction compte : seqinr::count the words with a certain number of letter
+# seqinr::count(cpg_A1,3)
+
+##### functions (in package) ####
 
 transition <- function(file, # fichier
                        l_word = 1, # longueur des mots
-                       n_seq = 1, # Nombre de sequences à analyser
-                       l_need = NULL, # length to downgrade if needed for model comparaison
+                       n_seq = 1, # Nombre de sequences a analyser
+                       # l_need = NULL, # length to downgrade if needed for model comparaison
                        log = TRUE,
                        type = "") {
-  seq <- read.fasta(file)
+  seq <- seqinr::read.fasta(file)
   Nseq <- length(seq)
 
   if (Nseq < n_seq) { # check if user want to input too many seq in the matrix learning
@@ -29,85 +31,87 @@ transition <- function(file, # fichier
     stop("This is really too much for me, abort!!!")
   }
 
-  if (!is.null(l_need)) {
-    if (l_need > l_word) {
-      stop("l_need is higher than l_word, you can't downscale higter, by definition...")
-    }else if(l_need == l_word){
-      l_need = NULL
-      warning("l_need is equal than l_word, therefore there is no downscale here")
-    }else if(l_need < 1){
-      l_need = NULL
-      warning("l_need is inferior to 1, therefore there is no downscale here")
-  }
-
-  tmp <- count(seq[[1]], l_word) + 1 # add 1 occurence to have at least 1 obs
+  # if (!is.null(l_need)) {
+  #   if (l_need > l_word) {
+  #     stop("l_need is higher than l_word, you can't downscale higter, by definition...")
+  #   }else if(l_need == l_word){
+  #     l_need = NULL
+  #     warning("l_need is equal than l_word, therefore there is no downscale here")
+  #   }else if(l_need < 1){
+  #     l_need = NULL
+  #     warning("l_need is inferior to 1, therefore there is no downscale here")
+  #   }
+  # }
+  
+  tmp <- seqinr::count(seq[[1]], l_word) + 1 # add 1 occurence to have at least 1 obs
 
   cat(paste("      ============ Training model M",type,l_word," ============        \n", sep = ""))
-  pb <- txtProgressBar(min = 0, max = n_seq, style = 3)
+  pb <- utils::txtProgressBar(min = 0, max = n_seq, style = 3)
   for (i in 2:n_seq) {
-    setTxtProgressBar(pb, i)
+    utils::settxtProgressBar(pb, i)
 
-    tmp <- tmp + count(seq[[i]], l_word)
+    tmp <- tmp + seqinr::count(seq[[i]], l_word)
   }
   close(pb)
 
-  # l_count = function(Seq,n = l_word){count(Seq,n)} # alternativ way, slower but pretty
+  # # alternativ way, slower but prettier
+  # cat(paste("      ============ Training model M",type,l_word," ============        \n", sep = ""))
+  # l_count = function(Seq,n = l_word){count(Seq,n)} 
   # tmp <- rowSums(sapply(seq,l_count))
   
-  # cat('avant modif')
-  # print(tmp)
-  
   # transformation to length needed
-  if (!is.null(l_need)) {
-    gap = l_word - l_need
-    for(i in 1:gap){
-      wind = 4^i
+  # if (!is.null(l_need)) {
+  if (l_word>1) {
+    # gap = l_word - l_need
+    # for(i in 1:gap){
+    i <- 1
+      wind = 4 # ^i
       for(j in 0:((length(tmp)/wind)-1)){
         tmp[(1+wind*j):(wind+wind*j)] <- tmp[(1+wind*j):(wind+wind*j)] * 4^(i-1) / sum(tmp[(1+wind*j):(wind+wind*j)] )
         # print(tmp[(1+wind*j):(wind+wind*j)])
       }
-      cat(paste('compress round = ', i," \n", sep=""))
-      cat(paste('compress wind = ', wind," \n", sep=""))
-    }
+      # cat(paste('compress round = ', i," \n", sep=""))
+      # cat(paste('compress wind = ', wind," \n", sep=""))
+      cat('      ============ Computing conditionnal probabilities ============        \n')
+   # }
   } else {
     tmp = tmp / sum(tmp)
   }
-  
-  # cat('apres modif')
-  # print(tmp)
   
   # possibility to compute without log
   if (log) {
     tmp = log(tmp)
   }
-  
-  # cat('final')
-  # print(tmp)
+
   return(tmp)
 }
-#  mP <-transition(file = "raw_data/mus_cpg_app.fa", n_seq = 1160, l_word = 3, log = F, l_need = 2)
+# mP <-transition(file = "raw_data/mus_cpg_app.fa", n_seq = 1160, l_word = 3, log = F) #, l_need = 2)
 #  mM <- transition(file = "raw_data/mus_cpg_app.fa", n_seq = 1160, l_word = 1, log = F)
 # 
 # mP ; mM
 # 
 # m1 <-transition(file = "raw_data/mus_cpg_app.fa", n_seq = 1160, l_word = 1, log = F)
 # m2 <-transition(file = "raw_data/mus_cpg_app.fa", n_seq = 1160, l_word = 2, log = F)
-# m3 <-transition(file = "raw_data/mus_cpg_app.fa", n_seq = 1160, l_word = 3, log = F, l_need = 2)
+# m3 <-transition(file = "raw_data/mus_cpg_app.fa", n_seq = 1160, l_word = 3, log = F) #, l_need = 2)
 # 
 # m1 ; m2 ; m3
 
 control <- function(file, # fichier
-                    pos_training, # file to train with for positive
-                    neg_training, # file to train with for negative
+                    pos_training = NULL, # file to train with for positive
+                    neg_training = NULL, # file to train with for negative
+                    trans_pos = NULL, #transition matrice pos
+                    trans_neg = NULL, #transition matrice pos
                     l_word_pos = 1, # word lenght for transition table positif
                     l_word_neg = 1, # word length for transition table negatif
                     n_train = 1, # number of sequences to train with
-                    n_seq = 1 # number of sequences to analyse
+                    n_seq = 1, # number of sequences to analyse
+                    quiet = FALSE
 ){
-  if(l_word_pos == l_word_neg){
+  if(is.null(c(trans_pos,trans_neg))){
+  # if(l_word_pos == l_word_neg){
     trans_pos <-transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type ="+")
     trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-")
-  } else {
+  # } else {
     # # need to downscale one model
     # l_order <- order(c(l_word_pos,l_word_neg) )
     # if(diff(l_order)>0){
@@ -121,11 +125,12 @@ control <- function(file, # fichier
     # }
     
     # in fact, need to downscale every model, but just to l_word_pos -1
-    trans_pos <-transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type ="+", l_need = l_word_pos-1)
-    trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-", l_need = l_word_neg-1)
-  }
+  #   trans_pos <-transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type ="+", l_need = l_word_pos-1)
+  #   trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-", l_need = l_word_neg-1)
+  # }
+  } 
   
-  seq <- read.fasta(file)
+  seq <- seqinr::read.fasta(file)
   Nseq <- length(seq)
   
   if(Nseq < n_seq){ # check if user want to input too many seq in the matrix learning
@@ -149,12 +154,12 @@ control <- function(file, # fichier
   p_init_pos = log(1/4^l_word_pos)
   p_init_neg = log(1/4^l_word_neg)
   
-  cat('      ============ Computing sensi and speci for the test sequences ============       \n')
-  pb <- txtProgressBar(min = 0, max = n_seq, style = 3)
+  if(!quiet) {cat('      ============ Computing sensi and speci for the test sequences ============       \n')
+  pb <- utils::txtProgressBar(min = 0, max = n_seq, style = 3)}
   for(i in 1:n_seq){
-    setTxtProgressBar(pb, i)
-    n_word_pos <- count(seq[[i]], l_word_pos)
-    n_word_neg <- count(seq[[i]], l_word_neg)
+    if(!quiet) utils::settxtProgressBar(pb, i)
+    n_word_pos <- seqinr::count(seq[[i]], l_word_pos)
+    n_word_neg <- seqinr::count(seq[[i]], l_word_neg)
     result$pos[i] <- p_init_pos + sum( trans_pos * n_word_pos )
     result$neg[i] <- p_init_neg + sum( trans_neg * n_word_neg )
     if(result$pos[i] > result$neg[i]){
@@ -163,7 +168,7 @@ control <- function(file, # fichier
       result$VP[i] <- FALSE ; result$FN[i] <- TRUE
       }
   }
-  close(pb)
+  if(!quiet) close(pb)
   
   tmp <- colSums(result[,1:2])
   return(tmp)
@@ -172,8 +177,9 @@ control <- function(file, # fichier
 # control(file = "raw_data/mus_cpg_test.fa", # fichier
 #         pos_training = "raw_data/mus_cpg_app.fa", # file to train with
 #         neg_training = "raw_data/mus_tem_app.fa", # file to train with
+#         #trans_pos = 42,
 #         l_word_pos = 2, # transition table positif
-#         l_word_neg = 4, # transition table negatif
+#         l_word_neg = 3, # transition table negatif
 #         n_train = 1160, # number of sequences to train with
 #         n_seq = 1163 # number of sequences to analyse
 # )
@@ -188,33 +194,48 @@ assembly <- function(pos_test, # fichier
                      n_seq = 1 # number of sequences to analyse
 ){
   
-  choix = menu(c("yes","no"),
+  choix =  utils::menu(c("yes","no"),
                title = "You will launch long computation, do you wish to procede further ?")
   if (choix ==1) cat("\n      ============ Go take a good coffee ============       \n\n")
   if (choix ==2) stop("You stopped the computations")
   
-  sensi <- speci <- matrix(rep(0,length(pos_seq)*length(neg_seq)),ncol = length(pos_seq),nrow = length(neg_seq))
   
-  for(i in 1:length(pos_seq)){
-    for(j in 1:length(neg_seq)){
-      
-      cat('\n      ============ Computing M+ ============       \n\n')
+  trans_pos <- list()
+  trans_neg <- list()
+  
+  cat('\n      ============ Training modeles ============       \n\n')
+  for(i in pos_seq){
+    trans_pos[[i]] <- transition(file = pos_training, n_seq = n_train, l_word = i, type = "+")
+  }
+  cat('\n')
+  for(j in neg_seq){
+    trans_neg[[j]] <- transition(file = neg_training, n_seq = n_train, l_word = j, type = "-")
+  }
+  
+  cat('\n      ============ Training modeles ============       \n\n')    
+  sensi <- speci <- matrix(rep(0,length(pos_seq)*length(neg_seq)),ncol = length(pos_seq),nrow = length(neg_seq))
+  for(i in pos_seq){
+    for(j in neg_seq){
+      cat('\n')
+      cat(paste("      ============ Model M+ (",i,"/",j,") ============        \n", sep = ""))
       pos <- control(file = pos_test, # fichier
-                     pos_training = pos_training, # file to train with
-                     neg_training = neg_training, # file to train with
-                     l_word_pos = pos_seq[i], # transition table positif
-                     l_word_neg = neg_seq[j], # transition table negatif
+                     trans_pos = trans_pos[[i]], #transition matrice pos
+                     trans_neg = trans_neg[[j]], #transition matrice neg
+                     l_word_pos = i, # transition table positif
+                     l_word_neg = j, # transition table negatif
                      n_train = n_train, # number of sequences to train with
-                     n_seq = n_seq # number of sequences to analyse
+                     n_seq = n_seq, # number of sequences to analyse
+                     quiet = TRUE
       )
-      cat('\n      ============ Computing M- ============       \n')
+      cat(paste("      ============ Model M- (",i,"/",j,") ============        \n", sep = ""))
       neg <- control(file = neg_test, # fichier
-                     pos_training = pos_training, # file to train with
-                     neg_training = neg_training, # file to train with
-                     l_word_pos = pos_seq[i], # transition table positif
-                     l_word_neg = neg_seq[j], # transition table negatif
+                     trans_pos = trans_pos[[i]], #transition matrice pos
+                     trans_neg = trans_neg[[j]], #transition matrice neg
+                     l_word_pos = i, # transition table positif
+                     l_word_neg = j, # transition table negatif
                      n_train = n_train, # number of sequences to train with
-                     n_seq = n_seq # number of sequences to analyse
+                     n_seq = n_seq, # number of sequences to analyse
+                     quiet = TRUE
       )
 
       sensi[i,j] <- pos[1] / sum(pos)
@@ -229,6 +250,7 @@ assembly <- function(pos_test, # fichier
     }
   }
   
+  cat(paste("      ============ Come back from your coffee ============        \n", sep = ""))
   colnames(sensi) <- colnames(speci) <- paste("-",neg_seq, sep="")
   rownames(sensi) <- rownames(speci) <- paste("+",pos_seq, sep="")
   
@@ -237,13 +259,15 @@ assembly <- function(pos_test, # fichier
   return(final)
 }
 
+#### computations to choose model ####
+
 # takes long, warning
 cpg_fin = assembly("raw_data/mus_cpg_test.fa", # fichier
          "raw_data/mus_tem_test.fa",
          "raw_data/mus_cpg_app.fa", # file to train with for positive
          "raw_data/mus_tem_app.fa", # file to train with for negative
-         pos_seq = c(1:5),
-         neg_seq = c(1:5),
+         pos_seq = c(1:6),
+         neg_seq = c(1:6),
          n_train = 1160, # number of sequences to train with
          n_seq = 1163 # number of sequences to analyse
 )
@@ -253,7 +277,7 @@ GET(paste('https://smsapi.free-mobile.fr/sendmsg?user=17267063&pass=CDZDEAQ49d1q
           paste(as.character(charToRaw(txt)), collapse = "%"), sep = ""))
 
 # ça ne marche pas pour les couples où le minimum > 1 avec projet de base
-# tout redescendua 1 pour avoir des resultats...a voir si d'un point de vue mathématique ça colle
+# tout redescendua 1 pour avoir des resultats...a voir si d'un point de vue mathematique ça colle
 final = cpg_fin
 
 library(reshape)
@@ -270,29 +294,29 @@ ggplot(table, aes(M,m)) +
 
 table[which(table$tot == max(table$tot)),]
 
-# viterbi ####
+#### viterbi functions ####
 viterbi <- function(file = "raw_data/mus1.fa",
                     pos_training = "raw_data/mus_cpg_app.fa", # file to train with for positive
                     neg_training = "raw_data/mus_tem_app.fa", # file to train with for negative
-                    l_word_pos = 2,
+                    l_word_pos = 1,
                     l_word_neg = 1,
                     n_train = 1160,
                     n_ana = 1,
                     l_c = 1000, # length coding
                     l_nc = 125000 # length non-coding
                     ) {
-  if(l_word_pos == l_word_neg){
+  # if(l_word_pos == l_word_neg){
     trans_pos <-transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type ="+")
     trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-")
-  } else {
-    # need to downscale one model
-    l_order <- order(c(l_word_pos,l_word_neg) )
-    
-    trans_pos <-transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type ="+", l_need = 1)
-    trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-", l_need = 1)
-  }
+  # } else {
+  #   # need to downscale one model
+  #   l_order <- order(c(l_word_pos,l_word_neg) )
+  #   
+  #   trans_pos <-transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type ="+", l_need = 1)
+  #   trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-", l_need = 1)
+  # }
   
-  seq <- read.fasta(file)
+  seq <- seqinr::read.fasta(file)
   if(n_ana > 1) stop('Analysis for multiple files is not implemented yet')
   
   raw_seq <- seq[[1]]
@@ -306,8 +330,26 @@ viterbi <- function(file = "raw_data/mus1.fa",
   pos_init <- neg_init <- log(0.5)
   
   # initialisation
-  proba[beg,1] <- min(count(raw_seq[(beg-l_word_pos+1):beg], l_word_pos) * trans_pos) + pos_init
-  proba[beg,2] <- min(count(raw_seq[(beg-l_word_neg+1):beg], l_word_neg) * trans_neg) + neg_init
+  
+  # old version is v2 takes too long
+  # v1 = function(){
+  # trans_pos[which(names(trans_pos)==paste(raw_seq[(beg-l_word_pos+1):beg],collapse = ""))]
+  # }
+  # 
+  # v2 = function(){
+  # min(count(raw_seq[(beg-l_word_pos+1):beg], l_word_pos) * trans_pos)
+  # }
+  # 
+  # system.time(v1())
+  # system.time(v2())
+  
+  nom = paste(raw_seq[(beg-l_word_pos+1):beg],collapse = "")
+  trans_pos[which(names(trans_pos)==nom)]
+  
+  min(count(raw_seq[(beg-l_word_pos+1):beg], l_word_pos) * trans_pos)
+  
+  proba[beg,1] <- trans_pos[which(names(trans_pos)==paste(raw_seq[(beg-l_word_pos+1):beg],collapse = ""))] + pos_init
+  proba[beg,2] <- trans_neg[which(names(trans_neg)==paste(raw_seq[(beg-l_word_neg+1):beg],collapse = ""))] + neg_init
   
   # base before initialisation...what to put??? ####
   proba[1:beg-1,1] <- -42
@@ -315,8 +357,11 @@ viterbi <- function(file = "raw_data/mus1.fa",
   
   # head(proba)
   
-  trans_mod <- log(matrix(c(0.8,0.8,
-                            0.2,0.2)
+  l_c = 1/l_c
+  l_nc <- 1/l_nc
+  
+  trans_mod <- log(matrix(c(1-l_c,l_nc,
+                            l_c,1-l_nc)
                           ,ncol = 2,nrow = 2))
   colnames(trans_mod) <- rownames(trans_mod) <- c("c","nc")
   trans_mod
@@ -324,18 +369,18 @@ viterbi <- function(file = "raw_data/mus1.fa",
   # long = 50000
   
   beg <- beg + 1
-  cat('      ============ Viterbi is running ============       \n')
-  pb <- txtProgressBar(min = beg, max = long, style = 3)
+  cat('\n      ============ Viterbi is running ============       \n')
+  pb <- utils::txtProgressBar(min = beg, max = long, style = 3)
   for(i in beg:long){
-    setTxtProgressBar(pb, i)
+    utils::setTxtProgressBar(pb, i)
     
     # proba d'avoir la base sous M
-    pM <- max( min(count(raw_seq[(i-l_word_pos+1):i], l_word_pos) * trans_pos) + trans_mod[1,1],
-               min(count(raw_seq[(i-l_word_neg+1):i], l_word_neg) * trans_neg) + trans_mod[2,1])
+    pM <- trans_pos[which(names(trans_pos)==paste(raw_seq[(i-l_word_pos+1):i],collapse = ""))] + max( proba[i-1,1] + trans_mod[1,1],
+                                                                                                      proba[i-1,2] + trans_mod[2,1])
 
     # proba d'avoir la base sous m
-    pm <- max( min(count(raw_seq[(i-l_word_neg+1):i], l_word_neg) * trans_neg) + trans_mod[2,2],
-               min(count(raw_seq[(i-l_word_pos+1):i], l_word_pos) * trans_pos) + trans_mod[1,2])
+    pm <- trans_neg[which(names(trans_neg)==paste(raw_seq[(i-l_word_neg+1):i],collapse = ""))] + max( proba[i-1,2] + trans_mod[2,2],
+                                                                                                      proba[i-1,1] + trans_mod[1,2])
 
     proba[i,1] <- pM
     proba[i,2] <- pm
@@ -344,17 +389,15 @@ viterbi <- function(file = "raw_data/mus1.fa",
   close(pb)
   
   head(proba)
+  return(proba)
 }
 
-long = 100
-plot(x = 1:100, y = rep(1,long), col = proba[,3])
+library(BeeMarkov)
+mus1 = viterbi(l_word_pos = 5,
+        l_word_neg = 4)
 
-# # scrap ####
-# test = count(cpg_A1,2)
-# sum(matrix(test/sum(test),ncol = 4)[,1])
-# # il crée bien la matrice comme il faut avec count
-# titres = matrix(names(test), ncol = 4)
-# titres
+long = dim(mus1)[1]
+plot(x = 1:long, y = rep(1,long), col = mus1[,3])
 
 # time control ####
 # try = 6
@@ -373,7 +416,7 @@ plot(x = 1:100, y = rep(1,long), col = proba[,3])
 # v2 = function(){
 #   tmp <-count(seq[[1]], l_word)
 #   for(i in 2:n_seq){
-#     tmp <- tmp + count(seq[[i]], l_word)
+#     tmp <- tmp + seqinr::count(seq[[i]], l_word)
 #   }
 # tmp / sum(tmp)
 # }
