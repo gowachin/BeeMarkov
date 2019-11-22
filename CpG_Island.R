@@ -339,31 +339,10 @@ viterbi <- function(file = "raw_data/mus1.fa",
 
     proba[i,1] <- pM
     proba[i,2] <- pm
-    if(proba[i,1]>proba[i,2]) {proba[i,3]=2} else {proba[i,3]=3}
+    if(proba[i,1]>proba[i,2]) {proba[i,3]=1} else {proba[i,3]=2}
   }
   close(pb)
   
-  # cat('      ============ Viterbi is running backward ============       \n')
-  # pb <- txtProgressBar(min = beg, max = long, style = 3) ; j = beg
-  # for(i in long:beg){
-  #   j <- j +1 ; setTxtProgressBar(pb, j)
-  #   
-  #   if(proba[i,1]>proba[i,2]) {proba[i,3]=2} else {proba[i,3]=3}
-  #   
-  #   # # proba d'avoir la base sous M
-  #   # pM <- max( min(count(raw_seq[(i-l_word_pos+1):i], l_word_pos) * trans_pos) + trans_mod[1,1],
-  #   #            min(count(raw_seq[(i-l_word_neg+1):i], l_word_neg) * trans_neg) + trans_mod[2,1])
-  #   # 
-  #   # # proba d'avoir la base sous m
-  #   # pm <- max( min(count(raw_seq[(i-l_word_neg+1):i], l_word_neg) * trans_neg) + trans_mod[2,2],
-  #   #            min(count(raw_seq[(i-l_word_pos+1):i], l_word_pos) * trans_pos) + trans_mod[1,2])
-  #   # 
-  #   # proba[i,1] <- pM
-  #   # proba[i,2] <- pm
-  #   # if(proba[i,1]>proba[i,2]) {proba[i,3]=2} else {proba[i,3]=3}
-  # }
-  # close(pb)
-
   head(proba)
 }
 
