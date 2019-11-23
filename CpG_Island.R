@@ -343,17 +343,14 @@ viterbi <- function(file = "raw_data/mus1.fa",
   # system.time(v1())
   # system.time(v2())
   
-  nom = paste(raw_seq[(beg-l_word_pos+1):beg],collapse = "")
-  trans_pos[which(names(trans_pos)==nom)]
-  
-  min(count(raw_seq[(beg-l_word_pos+1):beg], l_word_pos) * trans_pos)
-  
   proba[beg,1] <- trans_pos[which(names(trans_pos)==paste(raw_seq[(beg-l_word_pos+1):beg],collapse = ""))] + pos_init
   proba[beg,2] <- trans_neg[which(names(trans_neg)==paste(raw_seq[(beg-l_word_neg+1):beg],collapse = ""))] + neg_init
+  if(proba[beg,1]>proba[beg,2]) {proba[beg,3]=1} else {proba[beg,3]=2}
   
   # base before initialisation...what to put??? ####
   proba[1:beg-1,1] <- -42
   proba[1:beg-1,2] <- -42
+  proba[1:beg-1,2] <- 0
   
   # head(proba)
   
@@ -398,6 +395,68 @@ mus1 = viterbi(l_word_pos = 5,
 
 long = dim(mus1)[1]
 plot(x = 1:long, y = rep(1,long), col = mus1[,3])
+
+head(mus1)
+
+# count the length of different parts
+seq <- mus1
+l_word <- 5
+seq <- cbind(seq,seq[,3],seq[,3],seq[,3],seq[,3])
+seq[1:l_word,c(3,6)] <- 0 
+seq[,5] <- 0
+seq[,7] <- FALSE
+colnames(seq)[4:dim(seq)[2]] <- c("length","rep_length","smoothed","is_smoothed")
+head(seq)
+# initialisation
+seq[1,4] <- 1
+cat('\n      ============ Forward boucle ============       \n')
+pb <- utils::txtProgressBar(min = 2, max = dim(seq)[1], style = 3)
+for(i in 2:dim(seq)[1]){
+  utils::setTxtProgressBar(pb, i)
+  tmp <- seq[i,]
+ if(seq[i,3]==seq[i-1,3]){
+   seq[i,4] <- seq[i-1,4]+1
+   seq[i-1,4] <- NA
+ }else{
+   seq[i,4] <- 1
+   }
+}
+close(pb)
+
+hist(seq[,4], nclass = 40000)
+summary(seq[,4])
+hist(seq[,4], nclass = 40000, xlim = c(1,20),col="darkgreen", freq=FALSE)
+
+cat('\n      ============ Backward boucle ============       \n')
+pb <- utils::txtProgressBar(min = 1, max = dim(seq)[1], style = 3) ; n = 1
+tmp <- seq[i,5] <- seq[dim(seq)[1],4]
+for(i in dim(seq)[1]:1){
+  utils::setTxtProgressBar(pb, n) ; n <- n+1
+  if(is.na(seq[i,4])){
+    seq[i,5] <- tmp
+  }else{
+    tmp <- seq[i,5] <- seq[i,4]
+  }
+}
+close(pb)
+
+wind <- 6
+cat('\n      ============ Smoothing boucle ============       \n')
+pb <- utils::txtProgressBar(min = 1, max = dim(seq)[1], style = 3)
+for(i in 1:dim(seq)[1]){
+  utils::setTxtProgressBar(pb, i)
+  if(seq[i,5] <= wind){
+    seq[i,6] <- 3
+    seq[i,7] <- 1
+  }
+}
+close(pb)
+
+# number of site that moved
+summary(as.factor(seq[,7]))
+long <- dim(seq)[1]
+long <- 1000
+plot(x = 1:long, y = seq[1:long,6], col = seq[1:long,6])
 
 # time control ####
 # try = 6
