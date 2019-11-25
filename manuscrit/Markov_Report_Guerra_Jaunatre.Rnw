@@ -35,7 +35,8 @@
 \hypersetup{
 colorlinks = true,
 linkcolor = blue,
-citecolor = RoyalBlue
+citecolor = RoyalBlue,
+urlcolor = black
 } % https://tex.stackexchange.com/questions/50747/options-for-appearance-of-links-in-hyperref
 \usepackage{lipsum} %Lorem ipsum
 
@@ -129,13 +130,15 @@ citecolor = RoyalBlue
     \begin{minipage}{.75\textwidth}
     \begin{center}
     {\Large Régression logistiquemultiple et prédiction des facteurs de risque concernant la survie en soins
-    intensifs.}
+    intensifs.
+    \todo[inline]{changer le titre}}
     \end{center}
     %\vspace{\baselineskip}
     %\setlength{\parskip}{\smallskipamount}
     \rule{7em}{.4pt}\par
-     Julia Guerra $^1$, Maxime Jaunatre $^2$ | Master 2 BEE Grenoble \par 
-     \href{mailto:Julia.Julia@etu.univ-grenoble-alpes.fr}{Mail $^1$}, \href{mailto:maxime.jaunatre@etu.univ-grenoble-alpes.fr}{Mail $^2$} | \today \par 
+    %\todo[color = red]{put ellie}
+     Julia Guerra $^1$, Maxime Jaunatre $^2$, Ellie Tideswell $^3$ | Master 2 BEE Grenoble \par 
+     \href{mailto:Julia.Julia@etu.univ-grenoble-alpes.fr}{Mail $^1$}, \href{mailto:maxime.jaunatre@etu.univ-grenoble-alpes.fr}{Mail $^2$} \href{mailto:etideswell@hotmail.co.uk}{Mail $^3$}| \today \par 
      %\href{mailto:Julia.Julia@etu.univ-grenoble-alpes.fr,maxime.jaunatre@etu.univ-grenoble-alpes.fr}{Mail} | \today
 \end{minipage}
 \end{figure}
@@ -145,9 +148,9 @@ citecolor = RoyalBlue
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Todo list pour travail en cours
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%\newpage
-%\listoftodos
-%\hrule\bigskip
+% \newpage
+\listoftodos
+\hrule\bigskip
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Table des matières
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -191,7 +194,7 @@ setwd("manuscrit")
 
 \subsection*{Présentation des données}
 
-<<data_visual , echo = F, eval=TRUE, pdf =TRUE, height= 4, width= 7>>=
+<<data_visual , echo = F, eval=F, pdf =TRUE, height= 4, width= 7>>=
 icu <- read.delim("../raw_data/icu.txt", header = TRUE)
 
 # transf en facteurs pour mieux analyser
@@ -252,7 +255,7 @@ Les données sont issues d'un échantillons de 200 patients d'hopitaux états-un
 
 Alors, avant la réalisation d'un possible modèle expliquant les observations, il sera néccessaire de limiter les biais introduits par ces variables. On peut donc dans un premier temps supprimer la variable `RACE`, car l'assignation des individus ne repose pas sur une mesure précise. Afin d'écarter d'autres variables qualitatives, leurs corrélations ont été évalués au moyen d'un test de $\chi^2$ par paires de variables.
 
-<<quali_cor , echo = F, eval=TRUE, results=hide>>=
+<<quali_cor , echo = F, eval=F, results=hide>>=
 sampleData <- function(data, percent.calib)
 {
   nCalib = nrow(data) * percent.calib/100
@@ -334,7 +337,7 @@ print(matable, file = "fig/quali_cor.tex", size = "tiny", NA.string = "NA",
 
 Il apparaît qu'effectuer ces tests de $\chi^2$ sur un plus petit jeu de données entraîne une dimition du nombre de corrélations. Pour les corrélations restantes après un échantillonnage, la variable `SER` est corrélée au plus d'autres variables. De même `PCO` est corrélée à 4 autres variables (Table \ref{table:quali_cor}). Il existe d'autres variables corrélées, mais il semble préférable de limiter le nombre de variables explicatives et de favoriser le choix de variables corrélées à plusieurs autres et dont les classes sont les moins déséquilibrées possibles (Figure \ref{fig:visual}). Parmis les variables qualitatives seront donc conservés : `SER`, `INF`, `PRE`, `TYP` et `PCO`.
 
-<<quanti_cor , echo = F, eval= T, results= hide>>=
+<<quanti_cor , echo = F, eval= F, results= hide>>=
 quantit <- c("HRA", "SYS")
 # 1) Check normality -- graphically
 
@@ -363,9 +366,9 @@ for (i in (2:nrow(var_corelations))) {
 var_pvalues[2,1] # pas de corrélation significative
 @
 
-Afin de limiter le nombre de variables, une analyse de corrélations entre les variables quantitatives est aussi réalisé. Les deux variables `HRA` (Rythme cardiaque) et `SYS` (Pression systolique) ne présentent pas des répartitions suivant une loi normale, avec une P-valeur au test de Shapiro de respectivement \Sexpr{round(hra_shap$p.value, 3)} et \Sexpr{round(sys_shap$p.value, 3)}, permettant de rejeter H0. Un test de corrélation de Kendall ne permet pas de souligner une corrélation entre les deux variables, avec une p-valeur de \Sexpr{round(var_pvalues[2,1], 3)}.
+Afin de limiter le nombre de variables, une analyse de corrélations entre les variables quantitatives est aussi réalisé. Les deux variables `HRA` (Rythme cardiaque) et `SYS` (Pression systolique) ne présentent pas des répartitions suivant une loi normale, avec une P-valeur au test de Shapiro de respectivement \Sexpr{round(3.14, 1)} et \Sexpr{round(3.14, 1)}, permettant de rejeter H0. Un test de corrélation de Kendall ne permet pas de souligner une corrélation entre les deux variables, avec une p-valeur de \Sexpr{round(3.14, 1)}.
 
-<<tri , echo = F, eval=T, results=hide>>=
+<<tri , echo = F, eval=F, results=hide>>=
 icu = icu[,c(2:4,6,9,11:14,18)]
 @
 
@@ -374,7 +377,7 @@ icu = icu[,c(2:4,6,9,11:14,18)]
 \subsection*{Modélisation}
 
 La selection de modèle avec plusieurs variables se fait par selection stepwise, au moyen de la fonction \verb|stepAIC| du package \verb|MASS|. Cette analyse est portée sur un jeu de donnée échantillonné ainsi que sur l'ensemble du jeu de données. Dans les deux cas, les variables choisies comme celles les plus discriminantes pour la survie sont l'âge de l'individu, la pression systolique lors de l'admission et le type d'admission. 
-<<step, echo = F, eval=T>>=
+<<step, echo = F, eval=F>>=
 # sample
 glmBase_s <- glm(STA ~ 1, data = icuvs_1, family = "binomial")
 stepwise_s <- stepAIC(glmBase_s, scope = list(
@@ -395,7 +398,7 @@ stepwise_t
 @
 
 
-<<model_70%, echo = F, eval=T, results=hide>>=
+<<model_70%, echo = F, eval=F, results=hide>>=
 # avec les variables choisies par le stepwise: TYP, AGE, SYS, AGE:SYS
 mod_s = glm(STA ~ AGE + TYP + SYS, data = icuvs_1, family = "binomial")
 summary(mod_s)
@@ -485,7 +488,7 @@ Des analyses successifs du test de Wald et du test de rapport de vraisemblance c
 
 De cette manière, on peut conclure que le modèle doit intégrer ces trois variables pour décrire la plupart des données. Le meilleur modèle à aborder est donc : \verb|STA ~ TYP + AGE * SYS |.  
 
-<<validation model 70% , echo = F, eval=T, results=hide>>=
+<<validation model 70% , echo = F, eval=F, results=hide>>=
 # d'abord pour SAMPLE :::::::::::::::::::::::::::::::::::::::::::::::
 mod_s = glm(STA ~ AGE + TYP + SYS, data = icuvs_1, family = "binomial")
 
@@ -505,7 +508,7 @@ cooks.distance(mod_s)[cooks.distance(mod_s)>1]
 @
 
 \subsection*{Validation du modèle}
-Le test de Hosmer \& Lemeshow soutient l'hypothèse que le modèle est compatible avec les données du sample 70\%, même si la p-valeur est proche de 0.05 (\Sexpr{round(rh1_s$p.value, 3 )}). La distance de Cook ne montre pas de points influents, ce qui nous fait accepter les observations du dataset. 
+Le test de Hosmer \& Lemeshow soutient l'hypothèse que le modèle est compatible avec les données du sample 70\%, même si la p-valeur est proche de 0.05 (\Sexpr{round(3.14, 1)}). La distance de Cook ne montre pas de points influents, ce qui nous fait accepter les observations du dataset. 
 
 \begin{figure}
 \vspace{-20pt}
@@ -516,7 +519,7 @@ Le test de Hosmer \& Lemeshow soutient l'hypothèse que le modèle est compatibl
 \end{center}
 \end{figure}
 
-<<performance model 70%, echo = F, eval=T, results=hide>>=
+<<performance model 70%, echo = F, eval=F, results=hide>>=
 library(pROC)
 # d'abord pour SAMPLE :::::::::::::::::::::::::::::::::::::::::::::::
 pred.test = predict(mod_s)
@@ -541,9 +544,9 @@ auc_t = roc_tot$auc
 @
 
 \subsection*{Performance du modèle}
-La surface en dessous de la courbe ROC (dîte valeur AUC) est de \Sexpr{round(auc_s, 3)}. Ce modèle ne semble pas être très performant, vu la grande surface en dessous de la courbe et la valeur de sensibilité de \Sexpr{round(counting_s[1,1]/(counting_s[1,1]+counting_s[2,1]),3)}, laquelle fait preuve du grand nombre de faux positifs. Les valeurs de AUC et de sensibilité s'améliorent relativement pour la totalité du jeu de données, avec un AUC de \Sexpr{round(auc_t, 3)} et une sensibilité de \Sexpr{round(counting_t[1,1]/(counting_t[1,1]+counting_t[2,1]), 3)}.  
+La surface en dessous de la courbe ROC (dîte valeur AUC) est de \Sexpr{round(3.14, 1)}. Ce modèle ne semble pas être très performant, vu la grande surface en dessous de la courbe et la valeur de sensibilité de \Sexpr{round(3.14, 1)}, laquelle fait preuve du grand nombre de faux positifs. Les valeurs de AUC et de sensibilité s'améliorent relativement pour la totalité du jeu de données, avec un AUC de \Sexpr{round(3.14, 1)} et une sensibilité de \Sexpr{round(3.14, 1)}.  
 
-<<model pour 100% et graph , echo = F, eval=T, results=hide>>=
+<<model pour 100% et graph , echo = F, eval=F, results=hide>>=
 # d'abord pour SAMPLE :::::::::::::::::::::::::::::::::::::::::::::::
 mod_GOOD = glm(STA ~ AGE * SYS + TYP, data = icu, family = "binomial")
 
@@ -594,7 +597,7 @@ Le choix du modèle était bien basé vu que, pour le sample 70\%, les modèles 
   \label{table:result2}
 \end{table} 
 
-C'est vrai que l'approche stepwise pour le dataset complet propose des effets croisés entre l'âge et la pression systolique comme explication d'une part de la variabilité des données. Une fois ajouté le terme des effets croisés, les valeurs de AUC et de sensibilité s'améliorent relativement avec un AUC de \Sexpr{auc_t_g} et une sensibilité de \Sexpr{round(counting_t_g[1,1]/(counting_t_g[1,1]+counting_t_g[2,1]), 3 )}
+C'est vrai que l'approche stepwise pour le dataset complet propose des effets croisés entre l'âge et la pression systolique comme explication d'une part de la variabilité des données. Une fois ajouté le terme des effets croisés, les valeurs de AUC et de sensibilité s'améliorent relativement avec un AUC de \Sexpr{round(3.14, 1)} et une sensibilité de \Sexpr{round(3.14, 1)}.
 
 
 \subsection*{Conclusion}
