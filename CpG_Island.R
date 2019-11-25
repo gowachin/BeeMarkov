@@ -491,7 +491,7 @@ smoothing <- function(seq,
       seq[i, 10] <- 1 # initiate new part length
       seq[i - 1, 13] <- i - 1 # put end value of precedent part
       seq[c(tmp:(i - 1)), 11] <- seq[i - 1, 10] # rep value of length for precedent part
-      seq[i, 11] <- tmp <- i # put begin value of the actual part
+      seq[i, 12] <- tmp <- i # put begin value of the actual part
     }
   }
   close(pb)
@@ -502,6 +502,31 @@ smoothing <- function(seq,
   
   return(seq)
 }
+
+
+graph <- function(seq,colors = c("blue","red","green"),nrow = 3,ycol = 4){
+  par(mfrow = c(nrow,1))
+  
+  long <- max(seq[,1])/nrow
+  for(i in 0:(nrow-1)){
+    plot(x = seq[((1+long*i):(long+long*i)),1],
+         y = seq[((1+long*i):(long+long*i)),ycol],
+         col = colors[seq[((1+long*i):(long+long*i)),9]])
+  }
+  par(mfrow = c(1,1))
+}
+
+resume <- function(seq){
+  beg <- s_mus1[which(!is.na(s_mus1[,12])),12] 
+  end <- s_mus1[which(!is.na(s_mus1[,13])),13]
+  long <- s_mus1[which(!is.na(s_mus1[,10])),10]
+  model <- s_mus1[which(!is.na(s_mus1[,10])),9]
+  length(beg) ; length((end)) ; length(long) ; length(model)
+  
+  table <- data.frame(beg,end,long,model)
+}
+
+graph(seq,nrow = 3, ycol = 9)
 
 s_mus1 <- smoothing(mus1,5,4,20)
 
@@ -514,6 +539,8 @@ mus1[236317,]
 summary(as.factor(s6_mus1[,10]))
 summary(as.factor(s20_mus1[,10]))
 
+
+head()
 plot(x = s20_mus1[,1], y = log(s20_mus1[,11]), col = s20_mus1[,9])
 abline(h = log(20), col = "blue")
 
