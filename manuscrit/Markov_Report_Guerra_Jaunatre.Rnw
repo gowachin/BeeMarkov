@@ -192,6 +192,177 @@ setwd("manuscrit")
 
 %\begin{multicols}{2}
 
+\section*{Introduction}
+L’avancée des techniques de séquençage a permis d’obtenir de grandes quantités d’informations génomiques. Durant ces dernières années, la génétique a embrassé les outils mathématiques de modélisation, parvenant à une caractérisation statistique des données de séquençage. Cette approche a permis  de décrire avec précision les motifs observés dans des régions étudiées , et de prédire leurs présences dans des séquences encore inconnues \citep{Wu2010}. Une des méthodes les plus connues dans ce domaine est l’utilisation des chaînes de Markov, introduites premièrement par \cite{Churchill1992} pour l’analyse de séquences génomiques puis par \cite{Durbin1998} pour la détection de régions CGI. 
+
+Dans le génome des deutérostomiens, la fréquence du dinucléotide C-G est moins importante qu’attendu sous une distribution aléatoire des quatre bases azotées. Ceci est une conséquence des mécanismes de protection contre la mutation spontanée du génome. En effet les bases de Thymine (T) subissent des erreurs de réplication quand elles sont placées sur le même brin et directement après une couple Cytosine-Guanine. L’élimination de ces couples C-G potentiellement dangereux se fait suite à un marquage par méthylation. Cependant, dans certaines régions de l’ADN nommées îlots CpG (ou CGI)  ce processus de méthylation est inhibé et donc la fréquence des dinucléotides C-G est donc plus élevée; par exemple aux alentours de certains promoteurs \citep{Saxonov2006a,Wu2010, Deaton2011}. 
+
+La grande variabilité dans la taille, la composition et l’emplacement de ces CGI rend difficile leurs définitions et donc l’établissement d’un algorithme unique permettant leurs détections indubitable \citep{Wu2010}. Ainsi, les modèles de Markov permettent de modéliser les fréquences des nucléotides en fonction de séquences déjà connues; ces séquences contenant ou non des CGI. En supplément des chaînes de Markov simples, il existe aussi les chaînes de Markov cachées: ces dernières décrivent de nombreux processus réels qui suivent un modèle de Markov,  mais qui ne sont que partiellement observables. Une chaîne de Markov cachée permettrait donc l’utilisation d’un seul modèle pour identifier un nucléotide (l’observation) et si ce dernier est à l’intérieur d’un îlot CpG ou non (aussi appelé l’état de la région).
+
+\section*{Matériel et méthodes}
+\subsection*{construire un modèle (markov simple)}
+<<transition , echo = F, eval=F, results=hide>>=
+transition <- function(data, percent.calib)
+{
+  cat('hello world')
+}
+
+transition()
+
+# ##visualisation of all stuff with or without sampling
+# #tibble::as.tibble(cbind.data.frame("names" = rownames(chtest_all[["pvalues"]]),chtest_all[["pvalues"]]))
+# correl = tibble::as.tibble(cbind.data.frame("names" = rownames(chtest_all[["pvalues"]]),chtest_all[["pvalues"]]))
+# 
+# correl = as.data.frame(correl[,-1])
+# rownames(correl) <- colnames(correl)
+# 
+# matable <- xtable(x = correl , label = "quali_cor")
+# # Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
+# print(matable, file = "fig/quali_cor.tex", size = "tiny", NA.string = "NA",
+#       table.placement = "!t",
+#       floating = FALSE,
+#       caption.placement="top",
+#       include.rownames = TRUE,
+#       include.colnames = TRUE,
+#       latex.environments = "center")
+# # On veut des '.' au lieu des des NA
+@
+jeu de données
+algo d’apprentissage
+
+\subsection*{test du meilleur modele}
+<<transition , echo = F, eval=F, results=hide>>=
+quality <- function(data, percent.calib)
+{
+  cat('hello world')
+}
+
+threshold <- function(data, percent.calib)
+{
+  control()
+}
+
+threshold()
+
+# ##visualisation of all stuff with or without sampling
+# #tibble::as.tibble(cbind.data.frame("names" = rownames(chtest_all[["pvalues"]]),chtest_all[["pvalues"]]))
+# correl = tibble::as.tibble(cbind.data.frame("names" = rownames(chtest_all[["pvalues"]]),chtest_all[["pvalues"]]))
+# 
+# correl = as.data.frame(correl[,-1])
+# rownames(correl) <- colnames(correl)
+# 
+# matable <- xtable(x = correl , label = "quali_cor")
+# # Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
+# print(matable, file = "fig/quali_cor.tex", size = "tiny", NA.string = "NA",
+#       table.placement = "!t",
+#       floating = FALSE,
+#       caption.placement="top",
+#       include.rownames = TRUE,
+#       include.colnames = TRUE,
+#       latex.environments = "center")
+# # On veut des '.' au lieu des des NA
+@
+calculer sensi et speci pour une base
+evaluer tout les sensi et speci tout au long séquence
+
+\subsection*{markov caché et algo viterbi}
+<<transition , echo = F, eval=F, results=hide>>=
+viterbi <- function(data, percent.calib)
+{
+  cat('hello world')
+}
+
+viterbi()
+
+# ##visualisation of all stuff with or without sampling
+# #tibble::as.tibble(cbind.data.frame("names" = rownames(chtest_all[["pvalues"]]),chtest_all[["pvalues"]]))
+# correl = tibble::as.tibble(cbind.data.frame("names" = rownames(chtest_all[["pvalues"]]),chtest_all[["pvalues"]]))
+# 
+# correl = as.data.frame(correl[,-1])
+# rownames(correl) <- colnames(correl)
+# 
+# matable <- xtable(x = correl , label = "quali_cor")
+# # Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
+# print(matable, file = "fig/quali_cor.tex", size = "tiny", NA.string = "NA",
+#       table.placement = "!t",
+#       floating = FALSE,
+#       caption.placement="top",
+#       include.rownames = TRUE,
+#       include.colnames = TRUE,
+#       latex.environments = "center")
+# # On veut des '.' au lieu des des NA
+@
+pourquoi que c’est mieux qu’une fenetre glissante
+parametrages viterbi - transition entre modèles + et -
+
+\subsection*{smoothing (maxime)}
+<<transition , echo = F, eval=F, results=hide>>=
+smoothing <- function(data, percent.calib)
+{
+  cat('hello world')
+}
+
+smoothing()
+
+# ##visualisation of all stuff with or without sampling
+# #tibble::as.tibble(cbind.data.frame("names" = rownames(chtest_all[["pvalues"]]),chtest_all[["pvalues"]]))
+# correl = tibble::as.tibble(cbind.data.frame("names" = rownames(chtest_all[["pvalues"]]),chtest_all[["pvalues"]]))
+# 
+# correl = as.data.frame(correl[,-1])
+# rownames(correl) <- colnames(correl)
+# 
+# matable <- xtable(x = correl , label = "quali_cor")
+# # Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
+# print(matable, file = "fig/quali_cor.tex", size = "tiny", NA.string = "NA",
+#       table.placement = "!t",
+#       floating = FALSE,
+#       caption.placement="top",
+#       include.rownames = TRUE,
+#       include.colnames = TRUE,
+#       latex.environments = "center")
+# # On veut des '.' au lieu des des NA
+@
+pourquoi
+comment	
+
+\section*{Résultats}
+\subsection*{mus1}
+table tronquée
+figure tronquée
+description du chromosome (nombre d’îlots cpg, taille des cpg, fenetre de smooth)
+\subsection*{mus2}
+description
+\subsection*{mus3}
+description
+
+\section*{Discussion}
+nos résultats sont badass
+moduler le choix de smoothing
+améliorations des algos (coder en autre langage), parallelisation du choix de meilleur modele
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Ressources
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\subsection*{Ressources}
+
+Ce document est disponible en ligne sous format ``.Rnw'', contenant tout le code néccessaire à la reproduction de l'analyse, réalisée avec un script en langage R \citep{RTeam2017}, ainsi que le jeu de données de départ. L'ensemble est situé sur Github : \url{https://github.com/gowachin/BeeMarkov}
+
+\subsection*{Annexes}
+\subsubsection*{mus1}
+table
+figure
+\subsubsection*{mus2}
+table
+figure
+\subsubsection*{mus3}
+table
+figure
+
+\subsubsection*{scripts}
+
+
+\iffalse
+|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
 \subsection*{Présentation des données}
 
 <<data_visual , echo = F, eval=F, pdf =TRUE, height= 4, width= 7>>=
@@ -607,21 +778,16 @@ L'analyse permet donc de faire ressortir des variables intéressantes sur la sur
 %\SweaveInput{child_test.Rnw}
 
 %\end{multicols}
+\fi
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Références
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %\newpage
-\cite{}
 \subsection*{Bibliographie}
 \bibliographystyle{authordate1}
-\bibliography{ICU}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Ressources
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-\subsection*{Ressources}
-
-Ce document est disponible en ligne sous format ``.Rnw'', contenant tout le code néccessaire à la reproduction de l'analyse, réalisée avec un script en langage R \citep{RTeam2017}, ainsi que le jeu de données de départ. L'ensemble est situé sur Github : \url{https://github.com/gowachin/GIS}
+\bibliography{../../../../Mendeley/Markov}
+% \bibliography{ICU}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Annexes

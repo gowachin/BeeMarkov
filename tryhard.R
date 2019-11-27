@@ -1,15 +1,17 @@
 #### compiling ####
 setwd("manuscrit")
 Sweave("Markov_Report_Guerra_Jaunatre.Rnw")
+Stangle("Markov_Report_Guerra_Jaunatre.Rnw")
 tools::texi2pdf("Markov_Report_Guerra_Jaunatre.tex") 
 file.remove(list.files()[ which(! list.files() %in% c("child_test.Rnw", 
                                                       "fig","ICU.bib", "tex",
-                                                      "Markov_Report_Guerra_Jaunatre.Rnw", 
+                                                      "Markov_Report_Guerra_Jaunatre.Rnw",
+                                                      "Markov_Report_Guerra_Jaunatre.R",
                                                       "Markov_Report_Guerra_Jaunatre.pdf",
                                                       "Markov_Report_Guerra_Jaunatre_oldversion.Rnw") )]
 )
 setwd("../")
-
+system('ls')
 system('xdg-open manuscrit/Markov_Report_Guerra_Jaunatre.pdf ') # works on ubuntu
 
 
