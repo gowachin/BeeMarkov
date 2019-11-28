@@ -3,6 +3,7 @@
 export(quality)
 export(threshold)
 export(transition)
+export(viterbi)
 import(graphics)
 import(seqinr)
 import(utils)

@@ -240,3 +240,144 @@ threshold <- function(pos_test, # fichier
   
   return(final)
 }
+
+
+#' viterbi
+#'
+#' Compute a data.frame explaining loglikelyhood of every base of a sequence
+#' with a Viterbi algorithme based of a model of transition between 2 different models. These models are 
+#' trained with 2 differents datasets.
+#'
+#' @param file a file (fasta) to read and to run viterbi on
+#' @param pos_training a file (fasta) to read and train the positive model
+#' @param neg_training a file (fasta) to read and train the negative model
+#' @param l_word_pos a value for lengths of words for the model. Equal to the "order of the model + 1" 
+#' @param l_word_neg a value fof lengths of words for the model. Equal to the "order of the model + 1" 
+#' @param n_train  number of sequences to train with
+#' @param n_ana number of sequences to analyse
+#' @param l_c mean length of a CpG+ region
+#' @param l_nc mean length of a CpG- region
+#'
+#'
+#' @author Jaunatre Maxime <maxime.jaunatre@etu.univ-grenoble-alpes.fr>
+#'
+#' @export
+viterbi <- function(file,
+                    pos_training = "raw_data/mus_cpg_app.fa", # file to train with for positive
+                    neg_training = "raw_data/mus_tem_app.fa", # file to train with for negative
+                    l_word_pos = 1,
+                    l_word_neg = 1,
+                    n_train = 1160,
+                    n_ana = 1,
+                    l_c = 1000, # length coding
+                    l_nc = 125000 # length non-coding
+) {
+  trans_pos <- transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type = "+")
+  trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-")
+  
+  seq <- seqinr::read.fasta(file)
+  if (n_ana > 1) stop("Analysis for multiple files is not implemented yet")
+  
+  raw_seq <- seq[[1]]
+  long <- length(raw_seq)
+  
+  beg <- max(l_word_pos, l_word_neg)
+  
+  # compute p_initial and transition matrix for markov
+  pos_init <- neg_init <- log(0.5)
+  l_c <- 1 / l_c
+  l_nc <- 1 / l_nc
+  
+  trans_mod <- log(matrix(c(
+    1 - l_c, l_nc,
+    l_c, 1 - l_nc
+  ),
+  ncol = 2, nrow = 2
+  ))
+  colnames(trans_mod) <- rownames(trans_mod) <- c("c", "nc")
+  
+  # initialisation
+  ncol <- 7
+  proba <- matrix(rep(NA, long * ncol), ncol = ncol)
+  colnames(proba) <- c("M+", "M-", "model", "length", "rep_length", "begin", "end")
+  
+  # time explode if it is not a matrix anymore !!!
+  # proba <- as.data.frame(proba)
+  
+  # old version is v2 takes too long
+  # v1 = function(){
+  # trans_pos[which(names(trans_pos)==paste(raw_seq[(beg-l_word_pos+1):beg],collapse = ""))]
+  # }
+  # v2 = function(){
+  # min(count(raw_seq[(beg-l_word_pos+1):beg], l_word_pos) * trans_pos)
+  # }
+  # system.time(v1())
+  # system.time(v2())
+  
+  # compute first base and initiate Viterbi
+  proba[beg, "M+"] <- trans_pos[which(names(trans_pos) == paste(raw_seq[(beg - l_word_pos + 1):beg], collapse = ""))] + pos_init
+  proba[beg, "M-"] <- trans_neg[which(names(trans_neg) == paste(raw_seq[(beg - l_word_neg + 1):beg], collapse = ""))] + neg_init
+  if (proba[beg, "M+"] > proba[beg, "M-"]) {
+    proba[beg, "model"] <- 1
+  } else {
+    proba[beg, "model"] <- 2
+  }
+  proba[beg, c("length", "rep_length")] <- 1
+  tmp <- proba[beg, c(6, 7)] <- beg
+  proba[1:beg - 1, "rep_length"] <- beg - 1
+  proba[1:beg - 1, "model"] <- 3
+  proba[1, "begin"] <- 1
+  proba[beg - 1, c(4, 7)] <- beg - 1
+  
+  beg <- beg + 1
+  cat("\n      ============ Viterbi is running ============       \n\n")
+  pb <- utils::txtProgressBar(min = beg, max = long, style = 3)
+  for (i in beg:long) {
+    utils::setTxtProgressBar(pb, i)
+    
+    # proba d'avoir la base sous M
+    pM <- trans_pos[which(names(trans_pos) == paste(raw_seq[(i - l_word_pos + 1):i], collapse = ""))] + max(
+      proba[i - 1, "M+"] + trans_mod[1, 1],
+      proba[i - 1, "M-"] + trans_mod[2, 1]
+    )
+    
+    # proba d'avoir la base sous m
+    pm <- trans_neg[which(names(trans_neg) == paste(raw_seq[(i - l_word_neg + 1):i], collapse = ""))] + max(
+      proba[i - 1, "M-"] + trans_mod[2, 2],
+      proba[i - 1, "M+"] + trans_mod[1, 2]
+    )
+    
+    proba[i, "M+"] <- pM
+    proba[i, "M-"] <- pm
+    
+    if (proba[i, "M+"] > proba[i, 2]) {
+      proba[i, "model"] <- 1
+    } else {
+      proba[i, "model"] <- 2
+    }
+    # length information
+    if (proba[i, "model"] == proba[i - 1, "model"]) {
+      proba[i, "length"] <- proba[i - 1, "length"] + 1 # increase part length
+      proba[i - 1, c(4, 7)] <- NA # erase length in previous ligne
+    } else {
+      proba[i, "length"] <- 1 # initiate new part length
+      proba[i - 1, "end"] <- i - 1 # put end value of precedent part
+      proba[c(tmp:(i - 1)), "rep_length"] <- proba[i - 1, "length"] # rep value of length for precedent part
+      proba[i, "begin"] <- tmp <- i # put begin value of the actual part
+    }
+  }
+  close(pb)
+  
+  # closing table
+  proba[i, "end"] <- i # put end value of precedent part
+  proba[c(tmp:(i)), "rep_length"] <- proba[i, "length"] # rep value of length for precedent part
+  
+  # add a column for the line number
+  proba <- cbind(c(1:dim(proba)[1]), proba)
+  colnames(proba)[1] <- "n"
+  
+  return(proba)
+}
+
+
+

@@ -5,5 +5,6 @@ data_prep.R
 biblio
 manuscrit
 raw_data
+figures
 tryhard.R
 CpG_Island.R
