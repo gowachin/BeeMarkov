@@ -230,6 +230,11 @@ transition()
 jeu de données
 algo d’apprentissage
 
+\begin{equation}
+P_+ (Sequence) = log(P_initiale (mot_initial)) + % \sum_{i=0,\ i\neq j}^n u_{ij
+% x'= ax\left(1-\frac{x}{K}\right)-bxy = 0
+\end{equation}
+
 \subsection*{test du meilleur modele}
 <<transition , echo = F, eval=F, results=hide>>=
 quality <- function(data, percent.calib)

@@ -379,5 +379,123 @@ viterbi <- function(file,
   return(proba)
 }
 
-
-
+#' smoothing
+#'
+#' Use the export table of viterbi function and apply two algorithms to smooth the data by two different variables
+#'
+#' @param seq export table of viterbi function
+#' @param l_word_pos a value for lengths of words for the model. Equal to the "order of the model + 1" 
+#' @param l_word_neg a value fof lengths of words for the model. Equal to the "order of the model + 1" 
+#' @param smooth_win minimal region length for a region to be kept under model + or -
+#' @param reject_win minimal region length for a region ambiguous to be kept under model ambiguous
+#'
+#' @author Jaunatre Maxime <maxime.jaunatre@etu.univ-grenoble-alpes.fr>
+#'
+#' @export
+smoothing <- function(seq,
+                      l_word_pos = 5,
+                      l_word_neg = 4,
+                      smooth_win = 10,
+                      reject_win = 1) {
+  
+  beg <- max(l_word_pos, l_word_neg)
+  
+  # finding ambiguous regions which are shorter than a certain windows
+  cat("      ============ Smoothing ============       \n")
+  seq <- cbind(seq, seq[, 4])
+  colnames(seq)[9] <- c("smoothed")
+  seq[which(seq[, "rep_length"] <= smooth_win), "smoothed"] <- 3
+  
+  # old version is v1 takes too long
+  # v1 = function(){
+  #   cat("      ============ Smoothing boucle ============       \n")
+  #   pb <- utils::txtProgressBar(min = 1, max = max(seq[, 1]), style = 3)
+  #   for (i in 1:dim(seq)[1]) {
+  #     utils::setTxtProgressBar(pb, i)
+  #     if (seq[i, 6] <= smooth_win) {
+  #       seq[i, "smoothed"] <- 3
+  #     }
+  #   }
+  #   close(pb)
+  # }
+  # v2 = function(){
+  #   seq[which(seq[, 6] <= smooth_win), "smoothed"] <- 3}
+  # system.time(v1())
+  # system.time(v2())
+  
+  # unified ambiguous regions
+  seq <- cbind(seq, seq[, c(5:8)])
+  colnames(seq)[10:13] <- paste("S_", colnames(seq[, c(10:13)]), sep = "")
+  
+  seq[beg, "S_length"] <- 1
+  tmp <- seq[beg, c("S_begin", "S_end")] <- beg
+  seq[-c(1:beg), c(10:13)] <- NA
+  
+  beg <- beg + 1
+  cat("\n      ============ Smoothing length ============      \n")
+  pb <- utils::txtProgressBar(min = beg - 1, max = dim(seq)[1], style = 3)
+  for (i in beg:dim(seq)[1]) {
+    utils::setTxtProgressBar(pb, i)
+    if (seq[i, "smoothed"] == seq[i - 1, "smoothed"]) {
+      seq[i, "S_length"] <- seq[i - 1, "S_length"] + 1 # increase part length
+      seq[i - 1, c("S_length", "S_end")] <- NA # erase length in previous ligne
+    } else {
+      seq[i, "S_length"] <- 1 # initiate new part length
+      seq[i - 1, "S_end"] <- i - 1 # put end value of precedent part
+      seq[c(tmp:(i - 1)), "S_rep_length"] <- seq[i - 1, "S_length"] # rep value of length for precedent part
+      seq[i, "S_begin"] <- tmp <- i # put begin value of the actual part
+    }
+  }
+  close(pb)
+  
+  # closing table
+  seq[i, 13] <- i # put end value of precedent part
+  seq[c(tmp:(i)), 11] <- seq[i, 10] # rep value of length for precedent part
+  
+  # to reject some region and put arbitrary models on them
+  if(reject_win > 1){
+    colnames(seq)[10:13] <- paste("R_", colnames(seq[, c(10:13)]), sep = "")
+    
+    head(seq)
+    
+    cat("      ============ Rejecting ============      \n")
+    # finding regions of length < reject_win between tho regions of same model. Changing the model to surrounding
+    solo_l <-seq[which(seq[,"R_S_length"] %in% unique(seq[, "R_S_rep_length"])),c("smoothed","R_S_rep_length")]
+    for(i in 2:(dim(solo_l)[1]-1)){
+      if(solo_l[i-1,1]==solo_l[i+1,1] && solo_l[i,2] < reject_win && solo_l[i,1] == 3) {solo_l[i,1] <- solo_l[i-1,1]}
+    }
+    
+    seq[,"smoothed"] <- rep(solo_l[,1],solo_l[,2])
+    
+    beg <- beg - 1
+    
+    seq[beg, "R_S_length"] <- 1
+    tmp <- seq[beg, c("R_S_begin", "R_S_end")] <- beg
+    seq[-c(1:beg), c(10:13)] <- NA
+    
+    beg <- beg + 1
+    seq[-c(1:beg), c(10:13)] <- NA
+    cat("\n      ============ Smoothing length after reject ============      \n")
+    pb <- utils::txtProgressBar(min = beg - 1, max = dim(seq)[1], style = 3)
+    for (i in beg:dim(seq)[1]) {
+      utils::setTxtProgressBar(pb, i)
+      if (seq[i, "smoothed"] == seq[i - 1, "smoothed"]) {
+        seq[i, "R_S_length"] <- seq[i - 1, "R_S_length"] + 1 # increase part length
+        seq[i - 1, c("R_S_length", "R_S_end")] <- NA # erase length in previous ligne
+      } else {
+        seq[i, "R_S_length"] <- 1 # initiate new part length
+        seq[i - 1, "R_S_end"] <- i - 1 # put end value of precedent part
+        seq[c(tmp:(i - 1)), "R_S_rep_length"] <- seq[i - 1, "R_S_length"] # rep value of length for precedent part
+        seq[i, "R_S_begin"] <- tmp <- i # put begin value of the actual part
+      }
+    }
+    close(pb)
+    
+    # closing table
+    seq[i, 13] <- i # put end value of precedent part
+    seq[c(tmp:(i)), 11] <- seq[i, 10] # rep value of length for precedent part
+    
+  }
+  
+  return(seq)
+}
