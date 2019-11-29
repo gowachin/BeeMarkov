@@ -178,6 +178,7 @@ urlcolor = black
 <<packages , echo = FALSE, eval=TRUE, results=hide>>=
 library(xtable)
 library(ggplot2)
+library(reshape)
 # library(plyr)
 # library(MASS)
 # library(ResourceSelection)
@@ -197,6 +198,7 @@ library(seqinr)
 
 <<working, eval = F>>=
 setwd("manuscrit")
+rerun = TRUE
 @
 % 4 pages max
 
@@ -214,10 +216,8 @@ La grande variabilité dans la taille, la composition et l’emplacement de ces 
 \subsection{Modèles de Markov simples}
 
 %\subsection*{construire un modèle (markov simple)}
-\todo[inline, color = yellow]{jeu de donnée}
 Les modèles de Markov réalisés dans cette étude ont été construits à partir de deux jeux de séquences de  souris (Mus musculus). Ces jeux de séquences avaient été caractérisés en avance comme contenant des îlots CpG (on notera “CpG+”), ou ne contenant pas d’îlots CpG (“CpG-”). Les deux jeux de séquences “app”, pour la construction des modèles CpG+ et CpG- ,contenaient 1160 et 5755 séquences respectivement. Des jeux supplémentaires “test” également caractérisés comme CpG+ ou CpG- (1163 et 5137 séquences) ont servi à évaluer la performance des modèles. 
  
-\todo[inline, color = yellow]{algo d’apprentissage}
 Dans un premier temps, les fréquences relatives d’observation des bases A, C, G, T ont été calculées pour la totalité des séquences de chaque jeu de données “app” (R,  fonction \verb|count| du package \verb|seqinr|; \cite{Charif2007}).  Ces données ont permis de construire la matrices de probabilité A du modèle d’ordre 0 (M0). Le terme “ordre” fait référence au nombre de bases précédentes conditionnant la probabilité de présence de la base étudiée. De cette manière, le M0 considère la probabilité d’occurrence de chaque base comme une variable aléatoire (équation \ref{eq:11}) dont les probabilités d’occurrence (équation \ref{eq:12})) sont différentes. En plus, des résultats différents sont attendus en fonction de la nature CpG+ ou CpG- des séquences; c’est pourquoi deux matrices de probabilité A+ et A- ont été construites, provenant respectivements des comptages du jeu CpG+ et CpG-.
 
 Le modèle de Markov d’ordre 1 (M1) rassemble les occurrences de chaque base en fonction de la base précédente. Les matrices de transition q1+ et q1- sont matrices 4x4 qui ont été donc construites à partir des comptages de chaque couple de bases. Vu qu’elle ne peut pas dépendre d’une base précédente, la probabilité d’occurrence de chaque base initiale a été considérée comme une variable aléatoire (équation \ref{eq:21}) à probabilités équivalentes (équation \ref{eq:22}). Ce protocole de construction de modèle a été refait pour l’ordre 2, obtenant une matrice 16x4. Pareil pour l’ordre  3 (matrice 64 x 4), l’ordre 4 \dots jusqu’à l’ordre 5. Pour les modèles d’ordre supérieur 0, les lignes de la matrice ont été rangées de sorte que la somme de chaque ligne soit égal à 1, à cause de la nature conditionnelle des probabilités, comme dans l'exemple suivant (table \ref{tab:trans}. 
@@ -239,7 +239,6 @@ P(A) = P(C) = P(G) = P(T) = P (X \in B) = \frac{1}{4}
 \label{eq:22}
 \end{equation}
 
-\todo[inline, color = red]{mettre exemple de matrice}
 <<transition , echo = F, eval=T, results=hide>>=
 transition <- function(file, # fichier
                        l_word = 1, # longueur des mots
@@ -324,7 +323,6 @@ P_+(Sequence) = log\left[P_{initial}(mot_{initial})\right] + \sum_{i=1}^{n = 4^{
 \end{equation}
 
 \begin{multicols}{2}
-
 \subsection*{Choix du meilleur modele}
 La performance du M1 a été testée sur les deux jeux de séquences de test. La log-vraisemblance de chaque séquence a été calculé pour chaque modèle (CpG+ et CpG-) et la séquence est donc associée à l’état pour lequel la log-vraisemblance est la plus grande. Pour le jeu de données CpG+, les séquences caractérisées comme CpG+ sont considérées comme vrais positifs (VP) et les séquences caractérisées CpG- comme faux négatifs (FN). Pour le jeu de données CpG-, les séquences caractérisées comme CpG+ sont considérées comme faux positifs (FP) et celles caractérisées comme CpG- comme vrais négatifs (VN). Le même protocole a été suivi pour tester la performance des modèles 1 à 6.
 		 
@@ -407,10 +405,10 @@ threshold <- function(pos_test, # fichier
                      n_seq = 1 # number of sequences to analyse
 ){
   
-  choix =utils::menu(c("yes","no"),
-               title = "You will launch long computation, do you wish to procede further ?")
-  if (choix ==1) cat("\n      ============ Go take a good coffee ============       \n\n")
-  if (choix ==2) stop("You stopped the computations")
+  # choix =utils::menu(c("yes","no"),
+  #              title = "You will launch long computation, do you wish to procede further ?")
+  # if (choix ==1) cat("\n      ============ Go take a good coffee ============       \n\n")
+  # if (choix ==2) stop("You stopped the computations")
   
   
   trans_pos <- list()
@@ -468,86 +466,115 @@ threshold <- function(pos_test, # fichier
 
 @
 
-Ce processus, répété pour toutes les combinaisons de Mi+/Mj- (avec i et j allant de 0 à 5), a permis de connaître la meilleure combinaison de modèle. Pour l’obtenir, les données de sensibilité et spécificité pour les modèles ont été sommés entre elles. La combinaison d’ordres portant la valeur maximale étant la valeur (5,4) de la matrice \todo[inline, color = red]{a voir si on choisis bien ce modele ou non}; les calculs de la chaîne de Markov cachée ont été réalisés sur un modèle d’ordre 5 pour les séquences CpG+ et un modèle d’ordre 4 pour les séquences CpG-. \todo[inline]{fig sensi }%La \ref{fig:sensispeci} montre les résultats de sensibilité et spécificité mentionnées ici. 
 
-\todo[inline, color = red]{figure sensispeci}
+<<seuil , echo = F, eval=F, results=hide>>=
+if("final.RData" %in% list.files("fig/") && !rerun){
+  load("fig/final.RData")
+}else{
+  final <- threshold("../raw_data/mus_cpg_test.fa", # fichier
+  "../raw_data/mus_tem_test.fa",
+  "../raw_data/mus_cpg_app.fa", # file to train with for positive
+  "../raw_data/mus_tem_app.fa", # file to train with for negative
+  pos_seq = c(1:2),
+  neg_seq = c(1:2),
+  n_train = 1160, # number of sequences to train with
+  n_seq = 1163 # number of sequences to analyse
+)
+save(final,file = "fig/final.RData")
+}
 
-\subsection{Modèles de Markov cachés}
-Afin d’augmenter la résolution de l’analyse des séquences et donc de détecter plutôt l’emplacement des régions CGI (îlots CpG+) que la catégorie de toute la séquence les modèles de Markov cachés ont été utilisés. Les HMC permettent d’inclure les effets d’un processus sous-jacent au processus principal observé. Dans notre cas, la chaîne cachée sert à modéliser les transitions entre régions CGI et régions pas CGI à l’intérieur des séquences, ce qui n’est pas directement observable; le processus principale MM  centré toujours sur les observations de bases à chaque position.
-HERE: mettre en ordre / propre la description des calculs HMC 
- Par rapport aux modèles de Markov simples, un troisième paramètre doit donc être calculé (ainsi que les probabilités de transition entre états et les distribution initiales), ceci étant les probabilités d’émission des observations. Ces probabilités sont calculées à partir des
-valeurs moyennes des longueurs des îlots CpG, et des régions entre ces îlots. Les trois matrices (contenant des probabilités initiales, de transition et d'émission) ont la particularité d’avoir les lignes stochastiques. Ceci signifie que la somme des éléments de la ligne est égale à 1.
+table <- cbind(melt(final$sensi), melt(final$speci)[, 3])
+colnames(table) <- c("M", "m", "Sensi", "Speci")
+table$score <- table$Sensi + table$Speci
+
+visual <- ggplot(table, aes(M, m)) +
+  geom_raster(aes(fill = score), hjust = 0.5, vjust = 0.5, interpolate = FALSE) +
+  geom_contour(aes(z = score)) + xlab("CpG+") + ylab("CpG-")
+visual
+ggsave('visual.pdf', plot = visual, device = "pdf", path = 'fig/',scale = 3, width = 7, height = 4, units = "cm", limitsize = T)
+rm(visual)
+
+table[which(table$tot == max(table$tot)),]
+@
+
+% \begin{wrapfigure}{r}{0.6\linewidth}
+% \begin{center}
+% \includegraphics[width=\linewidth]{fig/visual.pdf}
+% \end{center}
+% \caption{Evolution du score de sensibilité + spécificité selon les ordre de modèles}
+% \label{fig:sensispeci}
+% \end{wrapfigure}
+
+Ce processus, répété pour toutes les combinaisons de Mi+/Mj- (avec i et j allant de 0 à 5), a permis de connaître la meilleure combinaison de modèle. Pour l’obtenir, les données de sensibilité et spécificité pour les modèles ont été sommés entre elles. La combinaison d’ordres portant la valeur maximale étant la valeur (5,4) de la matrice; les calculs de la chaîne de Markov cachée ont été réalisés sur un modèle d’ordre 5 pour les séquences CpG+ et un modèle d’ordre 4 pour les séquences CpG-. La figure \ref{fig:sensispeci} montre les résultats de sensibilité et spécificité mentionnées ici.
+
+\end{multicols}
+
+\begin{figure*}[!ht]%{r}{0.6\linewidth}
+\begin{center}
+\includegraphics[width=\linewidth]{fig/visual.pdf}
+\end{center}
+\caption{Evolution du score de sensibilité + spécificité selon les ordre de modèles}
+\label{fig:sensispeci}
+\end{figure*}
+
+\begin{multicols}{2}
+
+Modèles de Markov cachés
+Les bases mathématiques de l’analyse des îlots CGI parmi des HMM dans cet étude suit le protocole décrit dans \cite{Churchill1992}. Pour la construction des HMM, il a été nécessaire de calculer la probabilité de transition entre état CpG+ et état CpG- à l’intérieur d’une séquence. Les valeurs de cette matrice de transition 2x2 contenant d’états ont été obtenues à partir de la bibliographie, en prenant compte de la longueur moyenne des îlots CpG. Cette matrice (\ref{tab:trans_mod}) s'ajoute donc à la matrice des probabilités d’occurrence de chaque base (ou combinaison de bases) et à la matrice d’occurrence des bases initiales.  
+
+
+<<trans_mod , echo = F, eval=T, results=hide>>=
+  l_c <- 1 / 1000
+  l_nc <- 1 / 125000
+  
+   trans_mod <- log(matrix(c(
+    1 - l_c, l_nc,
+    l_c, 1 - l_nc
+  ),
+  ncol = 2, nrow = 2 , dimnames = list(c("M+","M-"),c("M+","M-"))
+  ))
+
+matable <- xtable(x = trans_mod , label = "tab:trans_mod")
+# Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
+print(matable, file = "fig/trans_mod.tex",size = "tiny", NA.string = "NA",
+      table.placement = "!t",
+      floating = FALSE,
+      caption.placement="top",
+      include.rownames = TRUE,
+      include.colnames = TRUE,
+      latex.environments = "center")
+@
+
+\begin{wraptable}{r}{0.3\linewidth}
+  \begin{center}
+  \input{fig/trans_mod.tex}
+  \end{center}
+  \caption{Matrice de transition du modèle CpG+ d'ordre 1}
+  \label{tab:trans_mod}
+\end{wraptable}  
 
 \subsection{L’algorithme de Viterbi}
-<<viterbi , echo = F, eval=F, results=hide>>=
-viterbi <- function(data, percent.calib)
-{
-  cat('hello world')
-}
 
-viterbi()
+Afin de trouver la séquence optimale d’états qui correspond à une séquence donnée d’observations, il est possible d’utiliser une fenêtre glissante (un algorithme naïf), dans laquelle les log vraisemblances sont calculés pour des segments de bases d’une longueur donnée. Bien que facile à implémenter, les résultats (en terme des prédictions des CGI) dépendent de la taille de la fenêtre choisi, ceci peut représenter un biais de cette méthode.  Une façon alternative peut être l’algorithme de Viterbi, un exemple de la programmation dynamique, qui permet d’identifier la séquence qui maximise la probabilité de générer les observations 
+\todo[inline, color = red]{Pardoux}. Le chemin le plus probable étant donné un modèle est déterminé via une procédure récursive. L’algorithme de Viterbi est décrit comme suit :
 
-# ##visualisation of all stuff with or without sampling
-# #tibble::as.tibble(cbind.data.frame("names" = rownames(chtest_all[["pvalues"]]),chtest_all[["pvalues"]]))
-# correl = tibble::as.tibble(cbind.data.frame("names" = rownames(chtest_all[["pvalues"]]),chtest_all[["pvalues"]]))
-# 
-# correl = as.data.frame(correl[,-1])
-# rownames(correl) <- colnames(correl)
-# 
-# matable <- xtable(x = correl , label = "quali_cor")
-# # Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
-# print(matable, file = "fig/quali_cor.tex", size = "tiny", NA.string = "NA",
-#       table.placement = "!t",
-#       floating = FALSE,
-#       caption.placement="top",
-#       include.rownames = TRUE,
-#       include.colnames = TRUE,
-#       latex.environments = "center")
-# # On veut des '.' au lieu des des NA
-@
-Afin de trouver la séquence optimale d’états qui correspond à une séquence donnée d’observations, il est possible d’utiliser une fenêtre glissante (un algorithme naïf), dans laquelle les log vraisemblances sont calculés pour des segments de bases d’une longueur donnée. Bien que facile à implémenter, les résultats (en terme des prédictions des CGI) dépendent de la taille de la fenêtre choisi, ceci peut représenter un biais de cette méthode.  Une façon alternative peut être l’algorithme de Viterbi, un exemple de la programmation dynamique, qui permet d’identifier la séquence qui maximise la probabilité de générer les observations  (Pardoux). Le chemin le plus probable étant donné un modèle est déterminé via une procédure récursive. L’algorithme de Viterbi est décrit comme suit :
-
- P(next observation|next state)  max current state P(next state|current state) max previous states P(previous states, current state|observations so far
-
-ou :  P(Ot+1|St+1)  max st P(St+1|st )  max s1 ...st-1 P(s1 . . . st-1, st|O1 . . . Ot)  
- 
-\todo[inline, color = red]{Parametrages de viterbi - transition entre modèles + et - }
-
-\subsection{Smoothing}
-<<smoothing , echo = F, eval=F, results=hide>>=
-smoothing <- function(data, percent.calib)
-{
-  cat('hello world')
-}
-
-smoothing()
-
-# ##visualisation of all stuff with or without sampling
-# #tibble::as.tibble(cbind.data.frame("names" = rownames(chtest_all[["pvalues"]]),chtest_all[["pvalues"]]))
-# correl = tibble::as.tibble(cbind.data.frame("names" = rownames(chtest_all[["pvalues"]]),chtest_all[["pvalues"]]))
-# 
-# correl = as.data.frame(correl[,-1])
-# rownames(correl) <- colnames(correl)
-# 
-# matable <- xtable(x = correl , label = "quali_cor")
-# # Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
-# print(matable, file = "fig/quali_cor.tex", size = "tiny", NA.string = "NA",
-#       table.placement = "!t",
-#       floating = FALSE,
-#       caption.placement="top",
-#       include.rownames = TRUE,
-#       include.colnames = TRUE,
-#       latex.environments = "center")
-# # On veut des '.' au lieu des des NA
-@
-
-La technique de “Smoothing” représente une technique mathématique qui enlève la variabilité parmi les données, impliquant souvent la redistribution du poids entre des régions de haute probabilité, et des régions de “zéro probabilité” (Boodidi 2007). 
+\subsection{Smoothing} 
+La technique de “Smoothing” représente une technique mathématique qui enlève la variabilité parmi les données, impliquant souvent la redistribution du poids entre des régions de haute probabilité, et des régions de “zéro probabilité” 
+\todo[inline, color = red]{Boodidi 2007}. 
 Dans le cadre de cette étude, le “Smoothing” revient donc à lisser la caractérisation des différentes régions en les ré-assignant selon 2 procédés successifs. 
-Dans un premier temps, les régions de longueur inférieur à un certain seuil (S) sont assignée à une nouvelle catégorie “Ambiguous”, en vert dans la figure \todo{fig smoothing} %\ref{fig:smoothing}.
-Cette première étape comporte également un algorithme qui compile ces nouvelles régions en une seule quand elles se suivent dans la séquence (voir bases 9 à 13), afin de mesurer la longueur de cette nouvelle région dont la catégorie est devenue unique.
 
+\begin{wrapfigure}{r}{0.6\linewidth}
+\begin{center}
+\includegraphics[width=\linewidth]{fig/smoothin_reject.png}
+\end{center}
+\caption{Evolution du score de sensibilité + spécificité selon les ordre de modèles}
+\label{fig:smoothing}
+\end{wrapfigure}
+
+Dans un premier temps, les régions de longueur inférieur à un certain seuil (S) sont assignée à une nouvelle catégorie “Ambiguous”, en vert dans la figure \ref{fig:smoothing}. Cette première étape comporte également un algorithme qui compile ces nouvelles régions en une seule quand elles se suivent dans la séquence (voir bases 9 à 13), afin de mesurer la longueur de cette nouvelle région dont la catégorie est devenue unique.
 Le second procédé vérifie la longueur de ces nouvelles régions ambiguës et leurs situations sur la séquence. En effet, il arrive qu’une région de petite taille soit considérée comme ambiguë entre deux régions d’une même catégorie (voir base 5). On peut donc supposer qu’il s’agit de bruit et que cette région est probablement de la même catégorie que celles qui l’entoure. Ainsi, le second procédé de smoothing va ré-assigner des régions ambiguës si leurs tailles sont inférieures à un seuil et que les régions bordantes sont de même nature.
 On note que l'algorithme de ‘Smoothing’ ne peut être utilisé qu’avec le second procédé, car en l’absence de régions ambiguës aucune ré-assignation vers CpG+ ou CpG- n’est possible. 
+
 
 \section*{Résultats}
 \subsection*{mus1}
@@ -560,9 +587,16 @@ description
 description
 
 \section*{Discussion}
-nos résultats sont badass
-moduler le choix de smoothing
-améliorations des algos (coder en autre langage), parallelisation du choix de meilleur modele
+\todo[inline, color = red]{nos resultats sont bien badass!!!!!}
+
+L’apprentissage de nos modèles est ici relativement rapide car le jeu de donnée d'entraînement est limité et nos modèles encore simplifiés. Cependant, il est important de noter que des modèles plus complexes entraînent des temps de calculs d’autant plus important. Dans ce contexte, il est donc important de souligner que tout n’a pas été fait pour optimiser l’apprentissage de nos modèles. Il reste encore possible de paralléliser différentes étapes de l’apprentissages ou du test des modèles différents. Une solution encore plus avancée serait de changer de langage de programmation afin de produire un algorithme plus efficace que celui proposé ici sour \verb|R|.
+
+Afin d'améliorer la performance de notre modèle, il serait raisonnable de raffiner la sélection des CGI identifiés, selon des propriétés connus des CGIs, tels que le contenu de GC, la fraction de CpG et un seuil de longueur \todo[inline]{ref to do(Lan et al 2009)}. De nombreux études ont relevé la fausse identification dans les CGI de petites quantités des nucléotides CpG+, identifiées comme CpG-. Un seuil minimal de longueur entre des nucléotides CpG+ en voisinage pourrait résoudre ce problème, donc un ‘smoothing’ plus dynamique ou les paramètres changent en fonction de l’état dans lequel la nucléotide se situe (CpG+ ou CpG-). Les CGI contiennent également une ratio élevé de G/C, ce qui est normalement de 60\% au minimum. L’application d’un tel seuil aux CGI identifiés pourrait représenter une amélioration supplémentaire du modèle. Les CGI sont souvent définis comme des régions d’un longueur de 140 paires de base, cependant certains auteurs indiquent qu’il existe une certaine variabilité qui rend cette définition éronée. Un seuil minimum de longueur a donc été suggéré par certains auteurs et il pourrait s’avérer intéressant de comparer les prédictions sans et avec son application, à faire avec caution \todo[inline]{ref to do(Lan et al 2009)}. 
+
+Une des limites des modèles de Markov cachés en général est la supposition que les distributions des paramètres d’observation suivent une loi géométrique.  \todo[inline]{ref to doBerg (2013)} a identifié d’autres limitations de l’utilisation des modèles de Markov cachés, dans un context des prédictions des CGI. Parmi ces limitations se trouve le constat que les résultats d’un tel modèle dépendent fortement des probabilités initiales, ainsi que des itérations d'entraînement du modèle. Berg a donc suggéré l'entraînement du modèle, et la ré-estimation subséquente des probabilités initiales afin de mieux représenter les états cachés, et ceci pourrait également représenter une amélioration possible de notre modèle. 
+
+Le détection précise des îlots CPG reste un sujet important dans un contexte médical, avec, parmi d’autres, de plus en plus d’associations identifiées entre le méthylation modifié et le cancer. Les régions se situant à moins de 20000 paires de base des frontières CGI, pour exemple, ont été identifiés comme des bons prédicteurs pour la location des régions qui subissent un méthylation modifié, spécifique aux cancers (“cancer-specific differentially methylated regions”) \todo[inline]{ref to do(Irizarry et al 2009)}. L’amélioration des modèles qui nous permettent donc de prédire avec précision ces régions représentent un défi important dans la détection des cancers.  
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Ressources
@@ -601,7 +635,15 @@ table
 figure
 
 \subsubsection*{scripts}
-
+Les analyses ont été effectuées avec le code ci-dessous, sous Rstudio (Version 1.1.456) :
+\todo[inline, color = red]{put script inside}
+{\begin{lstlisting}
+library(BeeMarkov)
+mus1 <- viterbi(file = "raw_data/mus1.fa",
+  l_word_pos = 5,
+  l_word_neg = 4
+)
+\end{lstlisting}}
 %\end{multicols}
 
 \iffalse
