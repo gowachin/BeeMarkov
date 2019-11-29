@@ -270,7 +270,7 @@ assembly <- function(pos_test, # fichier
 #### computations to choose model ####
 
 # takes long, warning
-cpg_fin <- assembly("raw_data/mus_cpg_test.fa", # fichier
+cpg_fin <- threshold("raw_data/mus_cpg_test.fa", # fichier
   "raw_data/mus_tem_test.fa",
   "raw_data/mus_cpg_app.fa", # file to train with for positive
   "raw_data/mus_tem_app.fa", # file to train with for negative
