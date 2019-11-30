@@ -280,12 +280,6 @@ cpg_fin <- threshold("raw_data/mus_cpg_test.fa", # fichier
   n_seq = 1163 # number of sequences to analyse
 )
 
-txt <- "Computation has ended"
-GET(paste("https://smsapi.free-mobile.fr/sendmsg?user=17267063&pass=CDZDEAQ49d1q3X&msg=%",
-  paste(as.character(charToRaw(txt)), collapse = "%"),
-  sep = ""
-))
-
 # ça ne marche pas pour les couples où le minimum > 1 avec projet de base
 # tout redescendua 1 pour avoir des resultats...a voir si d'un point de vue mathematique ça colle
 final <- cpg_fin
