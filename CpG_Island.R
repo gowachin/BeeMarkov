@@ -433,7 +433,7 @@ viterbi <- function(file,
 }
 
 library(BeeMarkov)
-mus1 <- viterbi(file = "raw_data/mus1.fa",
+mus3 <- viterbi(file = "raw_data/mus3.fa",
   l_word_pos = 5,
   l_word_neg = 4
 )
@@ -457,7 +457,6 @@ smoothing <- function(seq,
                       l_word_neg = 4,
                       smooth_win = 10,
                       reject_win = 1) {
-  seq <- mus1 # as.data.frame(mus1)
   beg <- max(l_word_pos, l_word_neg)
 
   # finding ambiguous regions which are shorter than a certain windows
@@ -562,13 +561,14 @@ smoothing <- function(seq,
 
 
 graph <- function(seq,colors = c("blue","red","green"),nrow = 3,ycol = 4){
-  par(mfrow = c(nrow,1))
+  par(mfrow = c(nrow,1), mar = c(3,2,1,1))
+  # c(5, 4, 4, 2)
   
   long <- max(seq[,1])/nrow
   for(i in 0:(nrow-1)){
     plot(x = seq[((1+long*i):(long+long*i)),1],
          y = seq[((1+long*i):(long+long*i)),ycol],
-         col = colors[seq[((1+long*i):(long+long*i)),9]])
+         col = colors[seq[((1+long*i):(long+long*i)),9]], xlab = " ", ylab = " ")
   }
   par(mfrow = c(1,1))
 }
@@ -583,9 +583,11 @@ resume <- function(seq){
   table <- data.frame(beg,end,long,model)
 }
 
-graph(seq,nrow = 3, ycol = 9)
 
+seq <- mus1
 seq <- smoothing(mus1,5,4,20, 10)
+
+graph(seq,nrow = 3, ycol = 9)
 
 length(unique(seq[,"R_S_length"]))
 

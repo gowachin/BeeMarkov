@@ -182,10 +182,10 @@ threshold <- function(pos_test, # fichier
                      n_seq = 1 # number of sequences to analyse
 ){
   
-  choix =utils::menu(c("yes","no"),
-               title = "You will launch long computation, do you wish to procede further ?")
-  if (choix ==1) cat("\n      ============ Go take a good coffee ============       \n\n")
-  if (choix ==2) stop("You stopped the computations")
+  # choix =utils::menu(c("yes","no"),
+  #              title = "You will launch long computation, do you wish to procede further ?")
+  # if (choix ==1) cat("\n      ============ Go take a good coffee ============       \n\n")
+  # if (choix ==2) stop("You stopped the computations")
   
   
   trans_pos <- list()

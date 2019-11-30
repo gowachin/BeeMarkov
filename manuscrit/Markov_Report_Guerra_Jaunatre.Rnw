@@ -53,8 +53,8 @@ urlcolor = black
 \DeclareCaptionType{annexe}[Annexe][Liste d'annexes] % rajout pour captions annexes
 \DeclareCaptionType{web}[Web][Sites Web] % rajout pour mettre des captions web
 
-\usepackage{todonotes} % notes et commentaires
-%\usepackage[disable]{todonotes} % pour supprimer les commentaires lors de la compil
+%\usepackage{todonotes} % notes et commentaires
+\usepackage[disable]{todonotes} % pour supprimer les commentaires lors de la compil
 
 \usepackage[export]{adjustbox}
 
@@ -133,9 +133,7 @@ urlcolor = black
    \centering
     \begin{minipage}{.75\textwidth}
     \begin{center}
-    {\Large Régression logistiquemultiple et prédiction des facteurs de risque concernant la survie en soins
-    intensifs.
-    \todo[inline]{changer le titre}}
+    {\Large Modélisation de la structure de chromosomes de souris par modèles de Markov cachés.}
     \end{center}
     %\vspace{\baselineskip}
     %\setlength{\parskip}{\smallskipamount}
@@ -194,11 +192,12 @@ if("BeeMarkov" %in% installed.packages()) {
 }
 
 library(seqinr)
+rerun = FALSE
 @
 
 <<working, eval = F>>=
 setwd("manuscrit")
-rerun = TRUE
+
 @
 % 4 pages max
 
@@ -213,7 +212,7 @@ La grande variabilité dans la taille, la composition et l’emplacement de ces 
 
 \section*{Matériel et méthodes}
 
-\subsection{Modèles de Markov simples}
+\subsection*{Modèles de Markov simples}
 
 %\subsection*{construire un modèle (markov simple)}
 Les modèles de Markov réalisés dans cette étude ont été construits à partir de deux jeux de séquences de  souris (Mus musculus). Ces jeux de séquences avaient été caractérisés en avance comme contenant des îlots CpG (on notera “CpG+”), ou ne contenant pas d’îlots CpG (“CpG-”). Les deux jeux de séquences “app”, pour la construction des modèles CpG+ et CpG- ,contenaient 1160 et 5755 séquences respectivement. Des jeux supplémentaires “test” également caractérisés comme CpG+ ou CpG- (1163 et 5137 séquences) ont servi à évaluer la performance des modèles. 
@@ -342,7 +341,7 @@ Specificity = \frac{VN}{VN+FP}
 %  \end{Multline}
 % \label{Equation_1}
 
-<<threshold , echo = F, eval=F, results=hide>>=
+<<threshold , echo = F, eval=T, results=hide>>=
 quality <- function(file, # fichier
                     pos_training = NULL, # file to train with for positive
                     neg_training = NULL, # file to train with for negative
@@ -467,7 +466,7 @@ threshold <- function(pos_test, # fichier
 @
 
 
-<<seuil , echo = F, eval=F, results=hide>>=
+<<seuil , echo = F, eval=T, results=hide>>=
 if("final.RData" %in% list.files("fig/") && !rerun){
   load("fig/final.RData")
 }else{
@@ -475,8 +474,8 @@ if("final.RData" %in% list.files("fig/") && !rerun){
   "../raw_data/mus_tem_test.fa",
   "../raw_data/mus_cpg_app.fa", # file to train with for positive
   "../raw_data/mus_tem_app.fa", # file to train with for negative
-  pos_seq = c(1:2),
-  neg_seq = c(1:2),
+  pos_seq = c(1:6),
+  neg_seq = c(1:6),
   n_train = 1160, # number of sequences to train with
   n_seq = 1163 # number of sequences to analyse
 )
@@ -553,15 +552,244 @@ print(matable, file = "fig/trans_mod.tex",size = "tiny", NA.string = "NA",
   \label{tab:trans_mod}
 \end{wraptable}  
 
-\subsection{L’algorithme de Viterbi}
+\subsection*{L’algorithme de Viterbi}
 
 Afin de trouver la séquence optimale d’états qui correspond à une séquence donnée d’observations, il est possible d’utiliser une fenêtre glissante (un algorithme naïf), dans laquelle les log vraisemblances sont calculés pour des segments de bases d’une longueur donnée. Bien que facile à implémenter, les résultats (en terme des prédictions des CGI) dépendent de la taille de la fenêtre choisi, ceci peut représenter un biais de cette méthode.  Une façon alternative peut être l’algorithme de Viterbi, un exemple de la programmation dynamique, qui permet d’identifier la séquence qui maximise la probabilité de générer les observations 
 \todo[inline, color = red]{Pardoux}. Le chemin le plus probable étant donné un modèle est déterminé via une procédure récursive. L’algorithme de Viterbi est décrit comme suit :
 
-\subsection{Smoothing} 
-La technique de “Smoothing” représente une technique mathématique qui enlève la variabilité parmi les données, impliquant souvent la redistribution du poids entre des régions de haute probabilité, et des régions de “zéro probabilité” 
-\todo[inline, color = red]{Boodidi 2007}. 
-Dans le cadre de cette étude, le “Smoothing” revient donc à lisser la caractérisation des différentes régions en les ré-assignant selon 2 procédés successifs. 
+<<viterbi , echo = F,eval = T, results = hide>>=
+viterbi <- function(file,
+                    pos_training = "../raw_data/mus_cpg_app.fa", # file to train with for positive
+                    neg_training = "../raw_data/mus_tem_app.fa", # file to train with for negative
+                    l_word_pos = 1,
+                    l_word_neg = 1,
+                    n_train = 1160,
+                    n_ana = 1,
+                    l_c = 1000, # length coding
+                    l_nc = 125000 # length non-coding
+) {
+  trans_pos <- transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type = "+")
+  trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-")
+  
+  seq <- seqinr::read.fasta(file)
+  if (n_ana > 1) stop("Analysis for multiple files is not implemented yet")
+  
+  raw_seq <- seq[[1]]
+  long <- length(raw_seq)
+  
+  beg <- max(l_word_pos, l_word_neg)
+  
+  # compute p_initial and transition matrix for markov
+  pos_init <- neg_init <- log(0.5)
+  l_c <- 1 / l_c
+  l_nc <- 1 / l_nc
+  
+  trans_mod <- log(matrix(c(
+    1 - l_c, l_nc,
+    l_c, 1 - l_nc
+  ),
+  ncol = 2, nrow = 2
+  ))
+  colnames(trans_mod) <- rownames(trans_mod) <- c("c", "nc")
+  
+  # initialisation
+  ncol <- 7
+  proba <- matrix(rep(NA, long * ncol), ncol = ncol)
+  colnames(proba) <- c("M+", "M-", "model", "length", "rep_length", "begin", "end")
+  
+  # time explode if it is not a matrix anymore !!!
+  # proba <- as.data.frame(proba)
+  
+  # old version is v2 takes too long
+  # v1 = function(){
+  # trans_pos[which(names(trans_pos)==paste(raw_seq[(beg-l_word_pos+1):beg],collapse = ""))]
+  # }
+  # v2 = function(){
+  # min(count(raw_seq[(beg-l_word_pos+1):beg], l_word_pos) * trans_pos)
+  # }
+  # system.time(v1())
+  # system.time(v2())
+  
+  # compute first base and initiate Viterbi
+  proba[beg, "M+"] <- trans_pos[which(names(trans_pos) == paste(raw_seq[(beg - l_word_pos + 1):beg], collapse = ""))] + pos_init
+  proba[beg, "M-"] <- trans_neg[which(names(trans_neg) == paste(raw_seq[(beg - l_word_neg + 1):beg], collapse = ""))] + neg_init
+  if (proba[beg, "M+"] > proba[beg, "M-"]) {
+    proba[beg, "model"] <- 1
+  } else {
+    proba[beg, "model"] <- 2
+  }
+  proba[beg, c("length", "rep_length")] <- 1
+  tmp <- proba[beg, c(6, 7)] <- beg
+  proba[1:beg - 1, "rep_length"] <- beg - 1
+  proba[1:beg - 1, "model"] <- 3
+  proba[1, "begin"] <- 1
+  proba[beg - 1, c(4, 7)] <- beg - 1
+  
+  beg <- beg + 1
+  cat("\n      ============ Viterbi is running ============       \n\n")
+  pb <- utils::txtProgressBar(min = beg, max = long, style = 3)
+  for (i in beg:long) {
+    utils::setTxtProgressBar(pb, i)
+    
+    # proba d'avoir la base sous M
+    pM <- trans_pos[which(names(trans_pos) == paste(raw_seq[(i - l_word_pos + 1):i], collapse = ""))] + max(
+      proba[i - 1, "M+"] + trans_mod[1, 1],
+      proba[i - 1, "M-"] + trans_mod[2, 1]
+    )
+    
+    # proba d'avoir la base sous m
+    pm <- trans_neg[which(names(trans_neg) == paste(raw_seq[(i - l_word_neg + 1):i], collapse = ""))] + max(
+      proba[i - 1, "M-"] + trans_mod[2, 2],
+      proba[i - 1, "M+"] + trans_mod[1, 2]
+    )
+    
+    proba[i, "M+"] <- pM
+    proba[i, "M-"] <- pm
+    
+    if (proba[i, "M+"] > proba[i, 2]) {
+      proba[i, "model"] <- 1
+    } else {
+      proba[i, "model"] <- 2
+    }
+    # length information
+    if (proba[i, "model"] == proba[i - 1, "model"]) {
+      proba[i, "length"] <- proba[i - 1, "length"] + 1 # increase part length
+      proba[i - 1, c(4, 7)] <- NA # erase length in previous ligne
+    } else {
+      proba[i, "length"] <- 1 # initiate new part length
+      proba[i - 1, "end"] <- i - 1 # put end value of precedent part
+      proba[c(tmp:(i - 1)), "rep_length"] <- proba[i - 1, "length"] # rep value of length for precedent part
+      proba[i, "begin"] <- tmp <- i # put begin value of the actual part
+    }
+  }
+  close(pb)
+  
+  # closing table
+  proba[i, "end"] <- i # put end value of precedent part
+  proba[c(tmp:(i)), "rep_length"] <- proba[i, "length"] # rep value of length for precedent part
+  
+  # add a column for the line number
+  proba <- cbind(c(1:dim(proba)[1]), proba)
+  colnames(proba)[1] <- "n"
+  
+  return(proba)
+}
+@
+
+
+\subsection*{Smoothing} 
+La technique de “Smoothing” représente une technique mathématique qui enlève la variabilité parmi les données, impliquant souvent la redistribution du poids entre des régions de haute probabilité, et des régions de “zéro probabilité” \todo[inline, color = red]{Boodidi 2007}. Dans le cadre de cette étude, le “Smoothing” revient donc à lisser la caractérisation des différentes régions en les ré-assignant selon 2 procédés successifs. 
+
+<<smoothing , echo = F,eval = T, results = hide>>=
+smoothing <- function(seq,
+                      l_word_pos = 5,
+                      l_word_neg = 4,
+                      smooth_win = 10,
+                      reject_win = 1) {
+  beg <- max(l_word_pos, l_word_neg)
+
+  # finding ambiguous regions which are shorter than a certain windows
+  cat("      ============ Smoothing ============       \n")
+  seq <- cbind(seq, seq[, 4])
+  colnames(seq)[9] <- c("smoothed")
+  seq[which(seq[, "rep_length"] <= smooth_win), "smoothed"] <- 3
+
+  # old version is v1 takes too long
+  # v1 = function(){
+  #   cat("      ============ Smoothing boucle ============       \n")
+  #   pb <- utils::txtProgressBar(min = 1, max = max(seq[, 1]), style = 3)
+  #   for (i in 1:dim(seq)[1]) {
+  #     utils::setTxtProgressBar(pb, i)
+  #     if (seq[i, 6] <= smooth_win) {
+  #       seq[i, "smoothed"] <- 3
+  #     }
+  #   }
+  #   close(pb)
+  # }
+  # v2 = function(){
+  #   seq[which(seq[, 6] <= smooth_win), "smoothed"] <- 3}
+  # system.time(v1())
+  # system.time(v2())
+  
+  # unified ambiguous regions
+  seq <- cbind(seq, seq[, c(5:8)])
+  colnames(seq)[10:13] <- paste("S_", colnames(seq[, c(10:13)]), sep = "")
+
+  seq[beg, "S_length"] <- 1
+  tmp <- seq[beg, c("S_begin", "S_end")] <- beg
+  seq[-c(1:beg), c(10:13)] <- NA
+
+  beg <- beg + 1
+  cat("\n      ============ Smoothing length ============      \n")
+  pb <- utils::txtProgressBar(min = beg - 1, max = dim(seq)[1], style = 3)
+  for (i in beg:dim(seq)[1]) {
+    utils::setTxtProgressBar(pb, i)
+    if (seq[i, "smoothed"] == seq[i - 1, "smoothed"]) {
+      seq[i, "S_length"] <- seq[i - 1, "S_length"] + 1 # increase part length
+      seq[i - 1, c("S_length", "S_end")] <- NA # erase length in previous ligne
+    } else {
+      seq[i, "S_length"] <- 1 # initiate new part length
+      seq[i - 1, "S_end"] <- i - 1 # put end value of precedent part
+      seq[c(tmp:(i - 1)), "S_rep_length"] <- seq[i - 1, "S_length"] # rep value of length for precedent part
+      seq[i, "S_begin"] <- tmp <- i # put begin value of the actual part
+    }
+  }
+  close(pb)
+
+  # closing table
+  seq[i, 13] <- i # put end value of precedent part
+  seq[c(tmp:(i)), 11] <- seq[i, 10] # rep value of length for precedent part
+  
+  # to reject some region and put arbitrary models on them
+  if(reject_win > 1){
+    colnames(seq)[10:13] <- paste("R_", colnames(seq[, c(10:13)]), sep = "")
+    
+    head(seq)
+    
+    cat("      ============ Rejecting ============      \n")
+    # finding regions of length < reject_win between tho regions of same model. Changing the model to surrounding
+    solo_l <-seq[which(seq[,"R_S_length"] %in% unique(seq[, "R_S_rep_length"])),c("smoothed","R_S_rep_length")]
+    for(i in 2:(dim(solo_l)[1]-1)){
+      if(solo_l[i-1,1]==solo_l[i+1,1] && solo_l[i,2] < reject_win && solo_l[i,1] == 3) {solo_l[i,1] <- solo_l[i-1,1]}
+    }
+    
+    seq[,"smoothed"] <- rep(solo_l[,1],solo_l[,2])
+    
+    beg <- beg - 1
+    
+    seq[beg, "R_S_length"] <- 1
+    tmp <- seq[beg, c("R_S_begin", "R_S_end")] <- beg
+    seq[-c(1:beg), c(10:13)] <- NA
+    
+    beg <- beg + 1
+    seq[-c(1:beg), c(10:13)] <- NA
+    cat("\n      ============ Smoothing length after reject ============      \n")
+    pb <- utils::txtProgressBar(min = beg - 1, max = dim(seq)[1], style = 3)
+    for (i in beg:dim(seq)[1]) {
+      utils::setTxtProgressBar(pb, i)
+      if (seq[i, "smoothed"] == seq[i - 1, "smoothed"]) {
+        seq[i, "R_S_length"] <- seq[i - 1, "R_S_length"] + 1 # increase part length
+        seq[i - 1, c("R_S_length", "R_S_end")] <- NA # erase length in previous ligne
+      } else {
+        seq[i, "R_S_length"] <- 1 # initiate new part length
+        seq[i - 1, "R_S_end"] <- i - 1 # put end value of precedent part
+        seq[c(tmp:(i - 1)), "R_S_rep_length"] <- seq[i - 1, "R_S_length"] # rep value of length for precedent part
+        seq[i, "R_S_begin"] <- tmp <- i # put begin value of the actual part
+      }
+    }
+    close(pb)
+    
+    # closing table
+    seq[i, 13] <- i # put end value of precedent part
+    seq[c(tmp:(i)), 11] <- seq[i, 10] # rep value of length for precedent part
+    
+  }
+  
+  return(seq)
+}
+@
+
+Dans un premier temps, les régions de longueur inférieur à un certain seuil (S) sont assignée à une nouvelle catégorie “Ambiguous”, en vert dans la figure \ref{fig:smoothing}. Cette première étape comporte également un algorithme qui compile ces nouvelles régions en une seule quand elles se suivent dans la séquence (voir bases 9 à 13), afin de mesurer la longueur de cette nouvelle région dont la catégorie est devenue unique.
 
 \begin{wrapfigure}{r}{0.6\linewidth}
 \begin{center}
@@ -571,31 +799,163 @@ Dans le cadre de cette étude, le “Smoothing” revient donc à lisser la cara
 \label{fig:smoothing}
 \end{wrapfigure}
 
-Dans un premier temps, les régions de longueur inférieur à un certain seuil (S) sont assignée à une nouvelle catégorie “Ambiguous”, en vert dans la figure \ref{fig:smoothing}. Cette première étape comporte également un algorithme qui compile ces nouvelles régions en une seule quand elles se suivent dans la séquence (voir bases 9 à 13), afin de mesurer la longueur de cette nouvelle région dont la catégorie est devenue unique.
 Le second procédé vérifie la longueur de ces nouvelles régions ambiguës et leurs situations sur la séquence. En effet, il arrive qu’une région de petite taille soit considérée comme ambiguë entre deux régions d’une même catégorie (voir base 5). On peut donc supposer qu’il s’agit de bruit et que cette région est probablement de la même catégorie que celles qui l’entoure. Ainsi, le second procédé de smoothing va ré-assigner des régions ambiguës si leurs tailles sont inférieures à un seuil et que les régions bordantes sont de même nature.
 On note que l'algorithme de ‘Smoothing’ ne peut être utilisé qu’avec le second procédé, car en l’absence de régions ambiguës aucune ré-assignation vers CpG+ ou CpG- n’est possible. 
 
+<<plot_resume , echo = F, eval=T, results=hide>>=
+graph <- function(seq,colors = c("blue","red","green"),nrow = 3,ycol = 4){
+  par(mfrow = c(nrow,1), mar = c(3,2,1,1))
+  # c(5, 4, 4, 2)
+  
+  long <- max(seq[,1])/nrow
+  for(i in 0:(nrow-1)){
+    plot(x = seq[((1+long*i):(long+long*i)),1],
+         y = seq[((1+long*i):(long+long*i)),ycol],
+         col = colors[seq[((1+long*i):(long+long*i)),9]], xlab = " ", ylab = " ")
+  }
+  par(mfrow = c(1,1))
+}
+
+resume <- function(seq){
+  beg <- seq[which(!is.na(seq[,12])),12] 
+  end <- seq[which(!is.na(seq[,13])),13]
+  long <- seq[which(!is.na(seq[,10])),10]
+  model <- seq[which(!is.na(seq[,10])),9]
+  length(beg) ; length((end)) ; length(long) ; length(model)
+  
+  table <- data.frame(beg,end,long,model)
+  return(table)
+}
+@
 
 \section*{Résultats}
 \subsection*{mus1}
-table tronquée
-figure tronquée
-description du chromosome (nombre d’îlots cpg, taille des cpg, fenetre de smooth)
+<<mus1 , echo = F, eval=T, results=hide>>=
+if("mus1.RData" %in% list.files("fig/") && !rerun){
+  load("fig/mus1.RData")
+}else{
+mus1 <- viterbi(file = "../raw_data/mus1.fa",
+  l_word_pos = 5,
+  l_word_neg = 4
+)
+save(mus1,file = "fig/mus1.RData")
+}
+
+mus1 <- smoothing(mus1,5,4,60, 40)
+
+jpeg("fig/mus1_s.jpg", width = 836, height = 496)
+# 2. Create the plot
+graph(mus1,nrow = 3, ycol = 9)
+# 3. Close the file
+dev.off()
+
+mus1_t <- resume(mus1)
+
+matable <- xtable(x = mus1_t , label = "tab:mus1_t")
+# Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
+print(matable, file = "fig/mus1_t.tex",size = "tiny", NA.string = "NA",
+      table.placement = "!t",
+      floating = FALSE,
+      caption.placement="top",
+      include.rownames = TRUE,
+      include.colnames = TRUE,
+      latex.environments = "center")
+@
+
+
+
+Après un viterbi pour le modèle M5+/M4-, et un smoothing avec S = 60 et R = 40, le chromosome de souris numero 1 met en évidence \Sexpr{summary(as.factor(mus1_t$model))[1]} régions CpG+ contre \Sexpr{summary(as.factor(mus1_t$model))[2]} régions CpG-, avec un grand déséquilibre de longueur entre ces régions. Ainsi, les régions CpG+ font en moyenne \Sexpr{round(mean(mus1_t[which(mus1_t$model==1),3]),3)} contre \Sexpr{round(mean(mus1_t[which(mus1_t$model==2),3]),3)} pour les régions CpG-. A contrario, les régions ambigües sont de faibles longueurs (\Sexpr{round(mean(mus1_t[which(mus1_t$model==3),3]),3)}), valeur proche du seuil de smoothing comme attendu. 
+
+Du fait de la grande longueur des régions CpG-, on observe que les régions CpG+ sont groupées et séparées par d'autres régions CpG- de taille limitée.
+
+L'ensemble des résultats pour le chromosome 1 est disponible en annexe.
+
 \subsection*{mus2}
-description
+<<mus2 , echo = F, eval=T, results=hide>>=
+if("mus2.RData" %in% list.files("fig/") && !rerun){
+  load("fig/mus2.RData")
+}else{
+mus2 <- viterbi(file = "../raw_data/mus2.fa",
+  l_word_pos = 5,
+  l_word_neg = 4
+)
+save(mus2,file = "fig/mus2.RData")
+}
+
+mus2 <- smoothing(mus2,5,4,60, 40)
+
+jpeg("fig/mus2_s.jpg", width = 836, height = 496)
+# 2. Create the plot
+graph(mus2,nrow = 3, ycol = 9)
+# 3. Close the file
+dev.off()
+
+mus2_t <- resume(mus2)
+
+matable <- xtable(x = mus2_t , label = "tab:mus2_t")
+# Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
+print(matable, file = "fig/mus2_t.tex",size = "tiny", NA.string = "NA",
+      table.placement = "!t",
+      floating = FALSE,
+      caption.placement="top",
+      include.rownames = TRUE,
+      include.colnames = TRUE,
+      latex.environments = "center")
+@
+Après un viterbi pour le modèle M5+/M4-, et un smoothing avec S = 60 et R = 40, le chromosome de souris numero 2 met en évidence \Sexpr{summary(as.factor(mus2_t$model))[1]} régions CpG+ contre \Sexpr{summary(as.factor(mus2_t$model))[2]} régions CpG-, avec un grand déséquilibre de longueur entre ces régions. Ainsi, les régions CpG+ font en moyenne \Sexpr{round(mean(mus2_t[which(mus2_t$model==1),3]),3)} contre \Sexpr{round(mean(mus2_t[which(mus2_t$model==2),3]),3)} pour les régions CpG-.
+
+Par rapport au chromosome numero 1, les régions CpG+ dont plus longues et centrées sur la fin du chromosome en une région bien définie.
+
+L'ensemble des résultats pour le chromosome 2 est disponible en annexe.
 \subsection*{mus3}
-description
+<<mus3 , echo = F, eval=T, results=hide>>=
+if("mus3.RData" %in% list.files("fig/") && !rerun){
+  load("fig/mus3.RData")
+}else{
+mus3 <- viterbi(file = "../raw_data/mus3.fa",
+  l_word_pos = 5,
+  l_word_neg = 4
+)
+save(mus3,file = "fig/mus3.RData")
+}
+
+mus3 <- smoothing(mus3,5,4,60, 40)
+
+jpeg("fig/mus3_s.jpg", width = 836, height = 496)
+# 2. Create the plot
+graph(mus3,nrow = 3, ycol = 9)
+# 3. Close the file
+dev.off()
+
+mus3_t <- resume(mus3)
+
+matable <- xtable(x = mus3_t , label = "tab:mus3_t")
+# Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
+print(matable, file = "fig/mus3_t.tex",size = "tiny", NA.string = "NA",
+      table.placement = "!t",
+      floating = FALSE,
+      caption.placement="top",
+      include.rownames = TRUE,
+      include.colnames = TRUE,
+      latex.environments = "center")
+@
+Après un viterbi pour le modèle M5+/M4-, et un smoothing avec S = 60 et R = 40, le chromosome de souris numero 1 met en évidence \Sexpr{summary(as.factor(mus3_t$model))[1]} régions CpG+ contre \Sexpr{summary(as.factor(mus3_t$model))[2]} régions CpG-, avec un grand déséquilibre de longueur entre ces régions. Ainsi, les régions CpG+ font en moyenne \Sexpr{round(mean(mus3_t[which(mus3_t$model==1),3]),3)} contre \Sexpr{round(mean(mus3_t[which(mus3_t$model==2),3]),3)} pour les régions CpG-.
+
+Concernant le chromosome 3, il présente très peu de régions CpG+ et elles sont de faible longueurs.
+
+L'ensemble des résultats pour le chromosome 3 est disponible en annexe.
 
 \section*{Discussion}
-\todo[inline, color = red]{nos resultats sont bien badass!!!!!}
+
+L'implémentation d'un algorithme de Viterbi a permis la caractérisation rapide de trois chromosomes de souris et la détection de régions CpG+. Ce genre d'outils montre donc son intéret pour une analyse rapide de données génomiques. On note cependant que la dernière partie de l'algorithme (smoothing) a été implémentée de manière sommaire et qu'une étude approfondie des seuils sur les résultats manque. La prochaine étape serait donc de tester différents seuils de smoothing (variant S et R), afin d'optimiser les résultats sur chaque chromosome.
 
 L’apprentissage de nos modèles est ici relativement rapide car le jeu de donnée d'entraînement est limité et nos modèles encore simplifiés. Cependant, il est important de noter que des modèles plus complexes entraînent des temps de calculs d’autant plus important. Dans ce contexte, il est donc important de souligner que tout n’a pas été fait pour optimiser l’apprentissage de nos modèles. Il reste encore possible de paralléliser différentes étapes de l’apprentissages ou du test des modèles différents. Une solution encore plus avancée serait de changer de langage de programmation afin de produire un algorithme plus efficace que celui proposé ici sour \verb|R|.
 
-Afin d'améliorer la performance de notre modèle, il serait raisonnable de raffiner la sélection des CGI identifiés, selon des propriétés connus des CGIs, tels que le contenu de GC, la fraction de CpG et un seuil de longueur \todo[inline]{ref to do(Lan et al 2009)}. De nombreux études ont relevé la fausse identification dans les CGI de petites quantités des nucléotides CpG+, identifiées comme CpG-. Un seuil minimal de longueur entre des nucléotides CpG+ en voisinage pourrait résoudre ce problème, donc un ‘smoothing’ plus dynamique ou les paramètres changent en fonction de l’état dans lequel la nucléotide se situe (CpG+ ou CpG-). Les CGI contiennent également une ratio élevé de G/C, ce qui est normalement de 60\% au minimum. L’application d’un tel seuil aux CGI identifiés pourrait représenter une amélioration supplémentaire du modèle. Les CGI sont souvent définis comme des régions d’un longueur de 140 paires de base, cependant certains auteurs indiquent qu’il existe une certaine variabilité qui rend cette définition éronée. Un seuil minimum de longueur a donc été suggéré par certains auteurs et il pourrait s’avérer intéressant de comparer les prédictions sans et avec son application, à faire avec caution \todo[inline]{ref to do(Lan et al 2009)}. 
+Afin d'améliorer la performance de notre modèle, il serait raisonnable de raffiner la sélection des CGI identifiés, selon des propriétés connus des CGIs, tels que le contenu de GC, la fraction de CpG et un seuil de longueur \citep{Lan2009}. De nombreux études ont relevé la fausse identification dans les CGI de petites quantités des nucléotides CpG+, identifiées comme CpG-. Un seuil minimal de longueur entre des nucléotides CpG+ en voisinage pourrait résoudre ce problème, donc un ‘smoothing’ plus dynamique ou les paramètres changent en fonction de l’état dans lequel la nucléotide se situe (CpG+ ou CpG-). Les CGI contiennent également une ratio élevé de G/C, ce qui est normalement de 60\% au minimum. L’application d’un tel seuil aux CGI identifiés pourrait représenter une amélioration supplémentaire du modèle. Les CGI sont souvent définis comme des régions d’un longueur de 140 paires de base, cependant certains auteurs indiquent qu’il existe une certaine variabilité qui rend cette définition éronée. Un seuil minimum de longueur a donc été suggéré par certains auteurs et il pourrait s’avérer intéressant de comparer les prédictions sans et avec son application, à faire avec caution \citep{Lan2009}. 
 
-Une des limites des modèles de Markov cachés en général est la supposition que les distributions des paramètres d’observation suivent une loi géométrique.  \todo[inline]{ref to doBerg (2013)} a identifié d’autres limitations de l’utilisation des modèles de Markov cachés, dans un context des prédictions des CGI. Parmi ces limitations se trouve le constat que les résultats d’un tel modèle dépendent fortement des probabilités initiales, ainsi que des itérations d'entraînement du modèle. Berg a donc suggéré l'entraînement du modèle, et la ré-estimation subséquente des probabilités initiales afin de mieux représenter les états cachés, et ceci pourrait également représenter une amélioration possible de notre modèle. 
+Une des limites des modèles de Markov cachés en général est la supposition que les distributions des paramètres d’observation suivent une loi géométrique.  \citep{Matthias2013} a identifié d’autres limitations de l’utilisation des modèles de Markov cachés, dans un context des prédictions des CGI. Parmi ces limitations se trouve le constat que les résultats d’un tel modèle dépendent fortement des probabilités initiales, ainsi que des itérations d'entraînement du modèle. Berg a donc suggéré l'entraînement du modèle, et la ré-estimation subséquente des probabilités initiales afin de mieux représenter les états cachés, et ceci pourrait également représenter une amélioration possible de notre modèle. 
 
-Le détection précise des îlots CPG reste un sujet important dans un contexte médical, avec, parmi d’autres, de plus en plus d’associations identifiées entre le méthylation modifié et le cancer. Les régions se situant à moins de 20000 paires de base des frontières CGI, pour exemple, ont été identifiés comme des bons prédicteurs pour la location des régions qui subissent un méthylation modifié, spécifique aux cancers (“cancer-specific differentially methylated regions”) \todo[inline]{ref to do(Irizarry et al 2009)}. L’amélioration des modèles qui nous permettent donc de prédire avec précision ces régions représentent un défi important dans la détection des cancers.  
+Le détection précise des îlots CPG reste un sujet important dans un contexte médical, avec, parmi d’autres, de plus en plus d’associations identifiées entre le méthylation modifié et le cancer. Les régions se situant à moins de 20000 paires de base des frontières CGI, pour exemple, ont été identifiés comme des bons prédicteurs pour la location des régions qui subissent un méthylation modifié, spécifique aux cancers (“cancer-specific differentially methylated regions”) \citep{Irizarry2009}. L’amélioration des modèles qui nous permettent donc de prédire avec précision ces régions représentent un défi important dans la détection des cancers.  
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -624,538 +984,700 @@ library(BeeMarkov)
 
 \newpage
 \subsection*{Annexes}
-\subsubsection*{mus1}
-table
-figure
-\subsubsection*{mus2}
-table
-figure
-\subsubsection*{mus3}
-table
-figure
+
+Représentation schématique de la structure du chromosome de souris numéro 1. Les modèles de Markov cachés permettent la détection des régions CpG+ (en bleu) versus les régions CpG- (en rouge). Le smoothing a été réalisé avec de valeurs de seuillage de s = 60 et r = 40, mais un certain marge de régions ambigües (en vert) est encore visible. 
+
+\begin{figure*}[!ht]%{r}{0.6\linewidth}
+\begin{center}
+\includegraphics[width=\linewidth]{fig/mus1_s.jpg}
+\end{center}
+\caption{Représentation schématique de la structure du chromosome de souris numéro 1. Les modèles de Markov cachés permettent la détection des régions CpG+ (en bleu) versus les régions CpG- (en rouge). Le smoothing a été réalisé avec de valeurs de seuillage de s = 60 et r = 40, mais un certain marge de régions ambigües (en vert) est encore visible. }
+\label{fig:mus1_s}
+\end{figure*}
+
+\newpage
+
+\begin{figure*}[!ht]%{r}{0.6\linewidth}
+\begin{center}
+\includegraphics[width=\linewidth]{fig/mus2_s.jpg}
+\end{center}
+\caption{Représentation schématique de la structure du chromosome de souris numéro 2. Les modèles de Markov cachés permettent la détection des régions CpG+ (en bleu) versus les régions CpG- (en rouge). Le smoothing a été réalisé avec de valeurs de seuillage de s = 60 et r = 40, mais un certain marge de régions ambigües (en vert) est encore visible. }
+\label{fig:mus2_s}
+\end{figure*}
+
+\begin{figure*}[!ht]%{r}{0.6\linewidth}
+\begin{center}
+\includegraphics[width=\linewidth]{fig/mus3_s.jpg}
+\end{center}
+\caption{Représentation schématique de la structure du chromosome de souris numéro 3. Les modèles de Markov cachés permettent la détection des régions CpG+ (en bleu) versus les régions CpG- (en rouge). Le smoothing a été réalisé avec de valeurs de seuillage de s = 60 et r = 40, mais un certain marge de régions ambigües (en vert) est encore visible.}
+\label{fig:mus3_s}
+\end{figure*}
+
+\newpage
+
+\begin{table*}
+  \begin{center}
+  \input{fig/mus1_t.tex}
+  \end{center}
+  \caption{Table récapitulative de la structure du chromosome de souris numéro 1. Les régions CpG+ (model = 1) versus les régions CpG- (model = 2). Le smoothing a été réalisé avec de valeurs de seuillage de s = 60 et r = 40, mais un certain marge de régions ambigües (model = 3) est encore visible.}
+  \label{tab:mus1_t}
+\end{table*}  
+
+\newpage
+
+\begin{table*}
+  \begin{center}
+  \input{fig/mus2_t.tex}
+  \end{center}
+  \caption{Table récapitulative de la structure du chromosome de souris numéro 2. Les régions CpG+ (model = 1) versus les régions CpG- (model = 2). Le smoothing a été réalisé avec de valeurs de seuillage de s = 60 et r = 40, mais un certain marge de régions ambigües (model = 3) est encore visible.}
+  \label{tab:mus2_t}
+\end{table*} 
+
+\newpage
+
+\begin{table*}
+  \begin{center}
+  \input{fig/mus3_t.tex}
+  \end{center}
+  \caption{Table récapitulative de la structure du chromosome de souris numéro 3. Les régions CpG+ (model = 1) versus les régions CpG- (model = 2). Le smoothing a été réalisé avec de valeurs de seuillage de s = 60 et r = 40, mais un certain marge de régions ambigües (model = 3) est encore visible.}
+  \label{tab:mus3_t}
+\end{table*}  
+
+
+\newpage
 
 \subsubsection*{scripts}
 Les analyses ont été effectuées avec le code ci-dessous, sous Rstudio (Version 1.1.456) :
 \todo[inline, color = red]{put script inside}
 {\begin{lstlisting}
-library(BeeMarkov)
-mus1 <- viterbi(file = "raw_data/mus1.fa",
+### R code from vignette source 'Markov_Report_Guerra_Jaunatre.Rnw'
+### Encoding: UTF-8
+
+###################################################
+### code chunk number 1: packages
+###################################################
+library(xtable)
+library(ggplot2)
+library(reshape)
+# library(plyr)
+# library(MASS)
+# library(ResourceSelection)
+# library(ggpubr)
+# library(tidyr)
+
+if("BeeMarkov" %in% installed.packages()) {
+  library(BeeMarkov)
+}else{
+  # library(devtools)
+  # install_github("gowachin/BeeMarkov")
+  # library(BeeMarkov)
+}
+
+library(seqinr)
+rerun = FALSE
+
+
+###################################################
+### code chunk number 2: working (eval = FALSE)
+###################################################
+## setwd("manuscrit")
+## 
+
+
+###################################################
+### code chunk number 3: transition
+###################################################
+transition <- function(file, # fichier
+                       l_word = 1, # longueur des mots
+                       n_seq = 1, # Nombre de sequences a analyser
+                       log = TRUE,
+                       type = "") {
+  seq <-seqinr::read.fasta(file)
+  Nseq <- length(seq)
+  
+  if (Nseq < n_seq) { # check if user want to input too many seq in the matrix learning
+    stop(paste("n_seq is larger than the number of sequence in this file ( ", Nseq, " sequences for this file).", sep = ""))
+  }
+  
+  l <- sapply(seq, length)
+  if (l_word > min(l) | l_word >= 10) {
+    stop("This is really too much for me, abort!!!")
+  }
+
+  tmp <-seqinr::count(seq[[1]], l_word) + 1 # add 1 occurence to have at least 1 obs
+  
+  cat(paste("      ============ Training model M",type,l_word," ============        \n", sep = ""))
+  pb <- utils::txtProgressBar(min = 0, max = n_seq, style = 3)
+  for (i in 2:n_seq) {
+    utils::setTxtProgressBar(pb, i)
+    
+    tmp <- tmp +seqinr::count(seq[[i]], l_word)
+  }
+  close(pb)
+  
+  # # alternativ way, slower but prettier
+  # cat(paste("      ============ Training model M",type,l_word," ============        \n", sep = ""))
+  # l_count = function(Seq,n = l_word){count(Seq,n)} 
+  # tmp <- rowSums(sapply(seq,l_count))
+  
+  if (l_word>1) {
+    i <- 1
+    wind = 4 
+    for(j in 0:((length(tmp)/wind)-1)){
+      tmp[(1+wind*j):(wind+wind*j)] <- tmp[(1+wind*j):(wind+wind*j)] * 4^(i-1) / sum(tmp[(1+wind*j):(wind+wind*j)] )
+    }
+    cat('      ============ Computing conditionnal probabilities ============        \n')
+  } else {
+    tmp = tmp / sum(tmp)
+  }
+  # possibility to compute without log
+  if (log) {
+    tmp = log(tmp)
+  }
+  return(tmp)
+}
+
+mP <-transition(file = "../raw_data/mus_cpg_app.fa", n_seq = 1160, l_word = 2, log = F)
+
+mP <- matrix(mP, byrow = TRUE, ncol = 4, dimnames = list(unique(substr(names(mP),1,1)),unique(substr(names(mP),1,1))))
+
+matable <- xtable(x = mP , label = "tab:trans")
+# Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
+print(matable, file = "fig/tab_trans.tex",size = "tiny", NA.string = "NA",
+      table.placement = "!t",
+      floating = FALSE,
+      caption.placement="top",
+      include.rownames = TRUE,
+      include.colnames = TRUE,
+      latex.environments = "center")
+
+
+###################################################
+### code chunk number 4: threshold
+###################################################
+quality <- function(file, # fichier
+                    pos_training = NULL, # file to train with for positive
+                    neg_training = NULL, # file to train with for negative
+                    trans_pos = NULL, #transition matrice pos
+                    trans_neg = NULL, #transition matrice pos
+                    l_word_pos = 1, # word lenght for transition table positif
+                    l_word_neg = 1, # word length for transition table negatif
+                    n_train = 1, # number of sequences to train with
+                    n_seq = 1, # number of sequences to analyse
+                    quiet = FALSE
+){
+  if(is.null(c(trans_pos,trans_neg))){
+    trans_pos <-transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type ="+")
+    trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-")
+  } 
+  
+  seq <-seqinr::read.fasta(file)
+  Nseq <- length(seq)
+  
+  if(Nseq < n_seq){ # check if user want to input too many seq in the matrix learning
+    stop(paste("n_seq is larger than the number of sequence in this file ( ",Nseq," sequences for this file).", sep = ""))
+  }
+  
+  result <- data.frame(VP = rep(FALSE,n_seq),
+                       FN = rep(TRUE,n_seq),
+                       pos = rep(NA,n_seq),
+                       neg = rep(NA,n_seq)
+  )
+  
+  p_init_pos = log(1/4^l_word_pos)
+  p_init_neg = log(1/4^l_word_neg)
+  
+  if(!quiet) {cat('      ============ Computing sensi and speci for the test sequences ============       \n')
+    pb <- utils::txtProgressBar(min = 0, max = n_seq, style = 3)}
+  for(i in 1:n_seq){
+    if(!quiet) utils::setTxtProgressBar(pb, i)
+    n_word_pos <-seqinr::count(seq[[i]], l_word_pos)
+    n_word_neg <-seqinr::count(seq[[i]], l_word_neg)
+    result$pos[i] <- p_init_pos + sum( trans_pos * n_word_pos )
+    result$neg[i] <- p_init_neg + sum( trans_neg * n_word_neg )
+    if(result$pos[i] > result$neg[i]){
+      result$VP[i] <- TRUE ; result$FN[i] <- FALSE 
+    } else { 
+      result$VP[i] <- FALSE ; result$FN[i] <- TRUE
+    }
+  }
+  if(!quiet) close(pb)
+  
+  tmp <- colSums(result[,1:2])
+  return(tmp)
+}
+
+threshold <- function(pos_test, # fichier
+                     neg_test,
+                     pos_training, # file to train with for positive
+                     neg_training, # file to train with for negative
+                     pos_seq = c(1:2),
+                     neg_seq = c(1:2),
+                     n_train = 1, # number of sequences to train with
+                     n_seq = 1 # number of sequences to analyse
+){
+  
+  # choix =utils::menu(c("yes","no"),
+  #              title = "You will launch long computation, do you wish to procede further ?")
+  # if (choix ==1) cat("\n      ============ Go take a good coffee ============       \n\n")
+  # if (choix ==2) stop("You stopped the computations")
+  
+  
+  trans_pos <- list()
+  trans_neg <- list()
+  
+  cat('\n      ============ Training modeles ============       \n\n')
+  for(i in pos_seq){
+    trans_pos[[i]] <- transition(file = pos_training, n_seq = n_train, l_word = i, type = "+")
+  }
+  cat('\n')
+  for(j in neg_seq){
+    trans_neg[[j]] <- transition(file = neg_training, n_seq = n_train, l_word = j, type = "-")
+  }
+  
+  cat('\n      ============ Training modeles ============       \n\n')    
+  sensi <- speci <- matrix(rep(0,length(pos_seq)*length(neg_seq)),ncol = length(pos_seq),nrow = length(neg_seq))
+  for(i in pos_seq){
+    for(j in neg_seq){
+      cat('\n')
+      cat(paste("      ============ Model M+ (",i,"/",j,") ============        \n", sep = ""))
+      pos <- quality(file = pos_test, # fichier
+                     trans_pos = trans_pos[[i]], #transition matrice pos
+                     trans_neg = trans_neg[[j]], #transition matrice neg
+                     l_word_pos = i, # transition table positif
+                     l_word_neg = j, # transition table negatif
+                     n_train = n_train, # number of sequences to train with
+                     n_seq = n_seq, # number of sequences to analyse
+                     quiet = TRUE
+      )
+      cat(paste("      ============ Model M- (",i,"/",j,") ============        \n", sep = ""))
+      neg <- quality(file = neg_test, # fichier
+                     trans_pos = trans_pos[[i]], #transition matrice pos
+                     trans_neg = trans_neg[[j]], #transition matrice neg
+                     l_word_pos = i, # transition table positif
+                     l_word_neg = j, # transition table negatif
+                     n_train = n_train, # number of sequences to train with
+                     n_seq = n_seq, # number of sequences to analyse
+                     quiet = TRUE
+      )
+      
+      sensi[i,j] <- pos[1] / sum(pos)
+      speci[i,j] <- neg[2] / sum(neg)
+      
+    }
+  }
+  
+  cat(paste("      ============ Come back from your coffee ============        \n", sep = ""))
+  colnames(sensi) <- colnames(speci) <- paste("-",neg_seq, sep="")
+  rownames(sensi) <- rownames(speci) <- paste("+",pos_seq, sep="")
+  
+  final <-list(sensi,speci) ; names(final) = c("sensi","speci")
+  
+  return(final)
+}
+
+
+
+###################################################
+### code chunk number 5: seuil
+###################################################
+if("final.RData" %in% list.files("fig/") && !rerun){
+  load("fig/final.RData")
+}else{
+  final <- threshold("../raw_data/mus_cpg_test.fa", # fichier
+  "../raw_data/mus_tem_test.fa",
+  "../raw_data/mus_cpg_app.fa", # file to train with for positive
+  "../raw_data/mus_tem_app.fa", # file to train with for negative
+  pos_seq = c(1:6),
+  neg_seq = c(1:6),
+  n_train = 1160, # number of sequences to train with
+  n_seq = 1163 # number of sequences to analyse
+)
+save(final,file = "fig/final.RData")
+}
+
+table <- cbind(melt(final$sensi), melt(final$speci)[, 3])
+colnames(table) <- c("M", "m", "Sensi", "Speci")
+table$score <- table$Sensi + table$Speci
+
+visual <- ggplot(table, aes(M, m)) +
+  geom_raster(aes(fill = score), hjust = 0.5, vjust = 0.5, interpolate = FALSE) +
+  geom_contour(aes(z = score)) + xlab("CpG+") + ylab("CpG-")
+visual
+ggsave('visual.pdf', plot = visual, device = "pdf", path = 'fig/',scale = 3, width = 7, height = 4, units = "cm", limitsize = T)
+rm(visual)
+
+table[which(table$tot == max(table$tot)),]
+
+
+###################################################
+### code chunk number 6: trans_mod
+###################################################
+  l_c <- 1 / 1000
+  l_nc <- 1 / 125000
+  
+   trans_mod <- log(matrix(c(
+    1 - l_c, l_nc,
+    l_c, 1 - l_nc
+  ),
+  ncol = 2, nrow = 2 , dimnames = list(c("M+","M-"),c("M+","M-"))
+  ))
+
+matable <- xtable(x = trans_mod , label = "tab:trans_mod")
+# Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
+print(matable, file = "fig/trans_mod.tex",size = "tiny", NA.string = "NA",
+      table.placement = "!t",
+      floating = FALSE,
+      caption.placement="top",
+      include.rownames = TRUE,
+      include.colnames = TRUE,
+      latex.environments = "center")
+
+
+###################################################
+### code chunk number 7: viterbi
+###################################################
+viterbi <- function(file,
+                    pos_training = "../raw_data/mus_cpg_app.fa", # file to train with for positive
+                    neg_training = "../raw_data/mus_tem_app.fa", # file to train with for negative
+                    l_word_pos = 1,
+                    l_word_neg = 1,
+                    n_train = 1160,
+                    n_ana = 1,
+                    l_c = 1000, # length coding
+                    l_nc = 125000 # length non-coding
+) {
+  trans_pos <- transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type = "+")
+  trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-")
+  
+  seq <- seqinr::read.fasta(file)
+  if (n_ana > 1) stop("Analysis for multiple files is not implemented yet")
+  
+  raw_seq <- seq[[1]]
+  long <- length(raw_seq)
+  
+  beg <- max(l_word_pos, l_word_neg)
+  
+  # compute p_initial and transition matrix for markov
+  pos_init <- neg_init <- log(0.5)
+  l_c <- 1 / l_c
+  l_nc <- 1 / l_nc
+  
+  trans_mod <- log(matrix(c(
+    1 - l_c, l_nc,
+    l_c, 1 - l_nc
+  ),
+  ncol = 2, nrow = 2
+  ))
+  colnames(trans_mod) <- rownames(trans_mod) <- c("c", "nc")
+  
+  # initialisation
+  ncol <- 7
+  proba <- matrix(rep(NA, long * ncol), ncol = ncol)
+  colnames(proba) <- c("M+", "M-", "model", "length", "rep_length", "begin", "end")
+  
+  # time explode if it is not a matrix anymore !!!
+  # proba <- as.data.frame(proba)
+  
+  # old version is v2 takes too long
+  # v1 = function(){
+  # trans_pos[which(names(trans_pos)==paste(raw_seq[(beg-l_word_pos+1):beg],collapse = ""))]
+  # }
+  # v2 = function(){
+  # min(count(raw_seq[(beg-l_word_pos+1):beg], l_word_pos) * trans_pos)
+  # }
+  # system.time(v1())
+  # system.time(v2())
+  
+  # compute first base and initiate Viterbi
+  proba[beg, "M+"] <- trans_pos[which(names(trans_pos) == paste(raw_seq[(beg - l_word_pos + 1):beg], collapse = ""))] + pos_init
+  proba[beg, "M-"] <- trans_neg[which(names(trans_neg) == paste(raw_seq[(beg - l_word_neg + 1):beg], collapse = ""))] + neg_init
+  if (proba[beg, "M+"] > proba[beg, "M-"]) {
+    proba[beg, "model"] <- 1
+  } else {
+    proba[beg, "model"] <- 2
+  }
+  proba[beg, c("length", "rep_length")] <- 1
+  tmp <- proba[beg, c(6, 7)] <- beg
+  proba[1:beg - 1, "rep_length"] <- beg - 1
+  proba[1:beg - 1, "model"] <- 3
+  proba[1, "begin"] <- 1
+  proba[beg - 1, c(4, 7)] <- beg - 1
+  
+  beg <- beg + 1
+  cat("\n      ============ Viterbi is running ============       \n\n")
+  pb <- utils::txtProgressBar(min = beg, max = long, style = 3)
+  for (i in beg:long) {
+    utils::setTxtProgressBar(pb, i)
+    
+    # proba d'avoir la base sous M
+    pM <- trans_pos[which(names(trans_pos) == paste(raw_seq[(i - l_word_pos + 1):i], collapse = ""))] + max(
+      proba[i - 1, "M+"] + trans_mod[1, 1],
+      proba[i - 1, "M-"] + trans_mod[2, 1]
+    )
+    
+    # proba d'avoir la base sous m
+    pm <- trans_neg[which(names(trans_neg) == paste(raw_seq[(i - l_word_neg + 1):i], collapse = ""))] + max(
+      proba[i - 1, "M-"] + trans_mod[2, 2],
+      proba[i - 1, "M+"] + trans_mod[1, 2]
+    )
+    
+    proba[i, "M+"] <- pM
+    proba[i, "M-"] <- pm
+    
+    if (proba[i, "M+"] > proba[i, 2]) {
+      proba[i, "model"] <- 1
+    } else {
+      proba[i, "model"] <- 2
+    }
+    # length information
+    if (proba[i, "model"] == proba[i - 1, "model"]) {
+      proba[i, "length"] <- proba[i - 1, "length"] + 1 # increase part length
+      proba[i - 1, c(4, 7)] <- NA # erase length in previous ligne
+    } else {
+      proba[i, "length"] <- 1 # initiate new part length
+      proba[i - 1, "end"] <- i - 1 # put end value of precedent part
+      proba[c(tmp:(i - 1)), "rep_length"] <- proba[i - 1, "length"] # rep value of length for precedent part
+      proba[i, "begin"] <- tmp <- i # put begin value of the actual part
+    }
+  }
+  close(pb)
+  
+  # closing table
+  proba[i, "end"] <- i # put end value of precedent part
+  proba[c(tmp:(i)), "rep_length"] <- proba[i, "length"] # rep value of length for precedent part
+  
+  # add a column for the line number
+  proba <- cbind(c(1:dim(proba)[1]), proba)
+  colnames(proba)[1] <- "n"
+  
+  return(proba)
+}
+
+
+###################################################
+### code chunk number 8: smoothing
+###################################################
+smoothing <- function(seq,
+                      l_word_pos = 5,
+                      l_word_neg = 4,
+                      smooth_win = 10,
+                      reject_win = 1) {
+  beg <- max(l_word_pos, l_word_neg)
+
+  # finding ambiguous regions which are shorter than a certain windows
+  cat("      ============ Smoothing ============       \n")
+  seq <- cbind(seq, seq[, 4])
+  colnames(seq)[9] <- c("smoothed")
+  seq[which(seq[, "rep_length"] <= smooth_win), "smoothed"] <- 3
+
+  # old version is v1 takes too long
+  # v1 = function(){
+  #   cat("      ============ Smoothing boucle ============       \n")
+  #   pb <- utils::txtProgressBar(min = 1, max = max(seq[, 1]), style = 3)
+  #   for (i in 1:dim(seq)[1]) {
+  #     utils::setTxtProgressBar(pb, i)
+  #     if (seq[i, 6] <= smooth_win) {
+  #       seq[i, "smoothed"] <- 3
+  #     }
+  #   }
+  #   close(pb)
+  # }
+  # v2 = function(){
+  #   seq[which(seq[, 6] <= smooth_win), "smoothed"] <- 3}
+  # system.time(v1())
+  # system.time(v2())
+  
+  # unified ambiguous regions
+  seq <- cbind(seq, seq[, c(5:8)])
+  colnames(seq)[10:13] <- paste("S_", colnames(seq[, c(10:13)]), sep = "")
+
+  seq[beg, "S_length"] <- 1
+  tmp <- seq[beg, c("S_begin", "S_end")] <- beg
+  seq[-c(1:beg), c(10:13)] <- NA
+
+  beg <- beg + 1
+  cat("\n      ============ Smoothing length ============      \n")
+  pb <- utils::txtProgressBar(min = beg - 1, max = dim(seq)[1], style = 3)
+  for (i in beg:dim(seq)[1]) {
+    utils::setTxtProgressBar(pb, i)
+    if (seq[i, "smoothed"] == seq[i - 1, "smoothed"]) {
+      seq[i, "S_length"] <- seq[i - 1, "S_length"] + 1 # increase part length
+      seq[i - 1, c("S_length", "S_end")] <- NA # erase length in previous ligne
+    } else {
+      seq[i, "S_length"] <- 1 # initiate new part length
+      seq[i - 1, "S_end"] <- i - 1 # put end value of precedent part
+      seq[c(tmp:(i - 1)), "S_rep_length"] <- seq[i - 1, "S_length"] # rep value of length for precedent part
+      seq[i, "S_begin"] <- tmp <- i # put begin value of the actual part
+    }
+  }
+  close(pb)
+
+  # closing table
+  seq[i, 13] <- i # put end value of precedent part
+  seq[c(tmp:(i)), 11] <- seq[i, 10] # rep value of length for precedent part
+  
+  # to reject some region and put arbitrary models on them
+  if(reject_win > 1){
+    colnames(seq)[10:13] <- paste("R_", colnames(seq[, c(10:13)]), sep = "")
+    
+    head(seq)
+    
+    cat("      ============ Rejecting ============      \n")
+    # finding regions of length < reject_win between tho regions of same model. Changing the model to surrounding
+    solo_l <-seq[which(seq[,"R_S_length"] %in% unique(seq[, "R_S_rep_length"])),c("smoothed","R_S_rep_length")]
+    for(i in 2:(dim(solo_l)[1]-1)){
+      if(solo_l[i-1,1]==solo_l[i+1,1] && solo_l[i,2] < reject_win && solo_l[i,1] == 3) {solo_l[i,1] <- solo_l[i-1,1]}
+    }
+    
+    seq[,"smoothed"] <- rep(solo_l[,1],solo_l[,2])
+    
+    beg <- beg - 1
+    
+    seq[beg, "R_S_length"] <- 1
+    tmp <- seq[beg, c("R_S_begin", "R_S_end")] <- beg
+    seq[-c(1:beg), c(10:13)] <- NA
+    
+    beg <- beg + 1
+    seq[-c(1:beg), c(10:13)] <- NA
+    cat("\n      ============ Smoothing length after reject ============      \n")
+    pb <- utils::txtProgressBar(min = beg - 1, max = dim(seq)[1], style = 3)
+    for (i in beg:dim(seq)[1]) {
+      utils::setTxtProgressBar(pb, i)
+      if (seq[i, "smoothed"] == seq[i - 1, "smoothed"]) {
+        seq[i, "R_S_length"] <- seq[i - 1, "R_S_length"] + 1 # increase part length
+        seq[i - 1, c("R_S_length", "R_S_end")] <- NA # erase length in previous ligne
+      } else {
+        seq[i, "R_S_length"] <- 1 # initiate new part length
+        seq[i - 1, "R_S_end"] <- i - 1 # put end value of precedent part
+        seq[c(tmp:(i - 1)), "R_S_rep_length"] <- seq[i - 1, "R_S_length"] # rep value of length for precedent part
+        seq[i, "R_S_begin"] <- tmp <- i # put begin value of the actual part
+      }
+    }
+    close(pb)
+    
+    # closing table
+    seq[i, 13] <- i # put end value of precedent part
+    seq[c(tmp:(i)), 11] <- seq[i, 10] # rep value of length for precedent part
+    
+  }
+  
+  return(seq)
+}
+
+
+###################################################
+### code chunk number 9: plot_resume
+###################################################
+graph <- function(seq,colors = c("blue","red","green"),nrow = 3,ycol = 4){
+  par(mfrow = c(nrow,1), mar = c(3,2,1,1))
+  # c(5, 4, 4, 2)
+  
+  long <- max(seq[,1])/nrow
+  for(i in 0:(nrow-1)){
+    plot(x = seq[((1+long*i):(long+long*i)),1],
+         y = seq[((1+long*i):(long+long*i)),ycol],
+         col = colors[seq[((1+long*i):(long+long*i)),9]], xlab = " ", ylab = " ")
+  }
+  par(mfrow = c(1,1))
+}
+
+resume <- function(seq){
+  beg <- seq[which(!is.na(seq[,12])),12] 
+  end <- seq[which(!is.na(seq[,13])),13]
+  long <- seq[which(!is.na(seq[,10])),10]
+  model <- seq[which(!is.na(seq[,10])),9]
+  length(beg) ; length((end)) ; length(long) ; length(model)
+  
+  table <- data.frame(beg,end,long,model)
+  return(table)
+}
+
+
+###################################################
+### code chunk number 10: mus1
+###################################################
+if("mus1.RData" %in% list.files("fig/") && !rerun){
+  load("fig/mus1.RData")
+}else{
+mus1 <- viterbi(file = "../raw_data/mus1.fa",
   l_word_pos = 5,
   l_word_neg = 4
 )
+save(mus1,file = "fig/mus1.RData")
+}
+
+mus1 <- smoothing(mus1,5,4,60, 40)
+
+jpeg("fig/mus1_s.jpg", width = 836, height = 496)
+# 2. Create the plot
+graph(mus1,nrow = 3, ycol = 9)
+# 3. Close the file
+dev.off()
+
+mus1_t <- resume(mus1)
+
+
+
+###################################################
+### code chunk number 11: mus2
+###################################################
+if("mus2.RData" %in% list.files("fig/") && !rerun){
+  load("fig/mus2.RData")
+}else{
+mus2 <- viterbi(file = "../raw_data/mus2.fa",
+  l_word_pos = 5,
+  l_word_neg = 4
+)
+save(mus2,file = "fig/mus2.RData")
+}
+
+mus2 <- smoothing(mus2,5,4,60, 40)
+
+jpeg("fig/mus2_s.jpg", width = 836, height = 496)
+# 2. Create the plot
+graph(mus2,nrow = 3, ycol = 9)
+# 3. Close the file
+dev.off()
+
+mus2_t <- resume(mus2)
+
+
+
+###################################################
+### code chunk number 12: mus3
+###################################################
+if("mus3.RData" %in% list.files("fig/") && !rerun){
+  load("fig/mus3.RData")
+}else{
+mus3 <- viterbi(file = "../raw_data/mus3.fa",
+  l_word_pos = 5,
+  l_word_neg = 4
+)
+save(mus3,file = "fig/mus3.RData")
+}
+
+mus3 <- smoothing(mus3,5,4,60, 40)
+
+jpeg("fig/mus3_s.jpg", width = 836, height = 496)
+# 2. Create the plot
+graph(mus3,nrow = 3, ycol = 9)
+# 3. Close the file
+dev.off()
+
+mus3_t <- resume(mus3)
+
+
+###################################################
+### code chunk number 13: github_install (eval = FALSE)
+###################################################
+## # NOT RUN
+## library(devtools)
+## install_github("gowachin/BeeMarkov")
+## library(BeeMarkov)
+
+
 \end{lstlisting}}
 %\end{multicols}
 
-\iffalse
-##################################################################################################################################
-%
-##################################################################################################################################
-\subsection*{Présentation des données}
-
-<<data_visual , echo = F, eval=F, pdf =TRUE, height= 4, width= 7>>=
-icu <- read.delim("../raw_data/icu.txt", header = TRUE)
-
-# transf en facteurs pour mieux analyser
-icu$LOC[which(icu$LOC == 2)] <- 1
-
-# creating alternative df with factors for binomial variables
-othr <- data.frame(sapply(icu[, -c(1, 3, 11, 12)], as.factor))
-icuf <- cbind(icu[, 1], othr, icu[, c(3, 11, 12)])
-rm(othr)
-
-s <- summary(icuf[, -c(1, 19:21)])
-s <- as.data.frame(s)
-s$Freq <- as.character(s$Freq)
-s <- separate(s, # tibble, dataframe
-  Freq, # column separated
-  sep = ":", # separator between columns
-  into = c("rm", "count"), # names of new variables
-  remove = TRUE
-)
-s <- s[, -c(1, 3)]
-s$count <- as.numeric(s$count)
-s$count <- replace_na(s$count, 0)
-s$l <- 1:dim(s)[1]
-s <- ddply(s, "Var2", transform, label_count = cumsum(count))
-s <- s[order(s$l), ]
-s <- s[, -3]
-s$label <- as.character(s$count)
-s$label[which(s$label == "0")] <- ""
-
-visual = ggplot(s, aes(x = Var2,y = count))+
-  geom_bar(stat = "identity", aes(fill = count), colour="black")+ 
-  geom_text(aes(y=label_count, label=label), vjust=1.6, 
-            color="white", size=3.5) +
-  scale_fill_gradient2(low = "#999999", high = "#E69F00",
-                       mid = "#56B4E9", midpoint = 100 , name = "Effectif") +
-  labs(x = "Variables Qualitatives", y = "") +
-  theme_classic() +
-  theme(axis.text.x = element_text(angle = 90)) 
-
-ggsave('visual.pdf', plot = visual, device = "pdf", path = 'fig/',scale = 3, width = 7, height = 4, units = "cm", limitsize = T)
-# sum(is.na(icu)) # no missing data
-rm(s,visual)
-@
-
-Les données sont issues d'un échantillons de 200 patients d'hopitaux états-uniens, extrait d'une étude portant sur la survie des patients à l'issue d'un séjour en service de soins intensifs. L'étude en question propose 20 variables mesurées pour 200 patients. Ces variables sont très diverses et comprennent la survie, divers paramètres régissant leur entrée dans le service et d'autres paramètres physiologiques. Toutes les variables sont discrètes à l'exeption de l'âge, la pression systolique (mm Hg) et le rythme cardiaque (battement/min.) à l'admission. Aucune valeur n'est manquante et les variables continues ne présentent pas de valeurs abérrantes. Il est cependant remarquable que de nombreuses variables qualitatives sont composées de 2 classes déséquilibrées (Figure \ref{fig:visual}). 
-
-\begin{wrapfigure}{r}{0.6\textwidth}
-\vspace{-20pt}
-\begin{center}
-\includegraphics[width=0.59\textwidth]{fig/visual.pdf}
-\end{center}
-\caption{\textbf{Répartition des effectifs dans les classes de variables qualitatives.} 
-%Abbréviation des variables (oui / non par défaut) : STA-Status (Vie / Mort), GENDER, RACE (Blanc / Noir / Autre), SER-Admission (Medical / Chirurgie), CAN-Cancer en cause, CRN-Maladie de rein chronique, INF-Infection probable, CPR, PRE-précédente admission (6mois), TYP-Admission/Urgence, FRA-fracture, PO2-Dioxygen (> 60 / < 60), PH (> 7.25 / < 7.25), PCO2-Dioxide de carbone (< 45 / > 45), BIC-Bicarbonate (> 18 / < 18), CRE-Creatinine(< 2.0 / > 2.0), LOC-Conscience (Stupeur / Inconscient / Coma)
-}
-\vspace{-20pt}
-\label{fig:visual}
-\end{wrapfigure}
-
-Alors, avant la réalisation d'un possible modèle expliquant les observations, il sera néccessaire de limiter les biais introduits par ces variables. On peut donc dans un premier temps supprimer la variable `RACE`, car l'assignation des individus ne repose pas sur une mesure précise. Afin d'écarter d'autres variables qualitatives, leurs corrélations ont été évalués au moyen d'un test de $\chi^2$ par paires de variables.
-
-<<quali_cor , echo = F, eval=F, results=hide>>=
-sampleData <- function(data, percent.calib)
-{
-  nCalib = nrow(data) * percent.calib/100
-  iCalib = sample(1:nrow(data), nCalib)
-  calib = data[iCalib,] 
- # test = data[-iCalib,] 
-  return(
-    #list(
-    calib=calib
-    #, test=test)
-    )
-}
-
-icuvs_1 = sampleData(icu, 70)
-
-qualits_all = colnames(icu[,-c(1,2,3,5,11,12)])
-
-chtest <- function(datas, namesvector) {
-  m1 <- matrix(
-    data = NA, nrow = length(namesvector), ncol = length(namesvector), byrow = FALSE,
-    dimnames = list(namesvector, namesvector)
-  )
-  m2 <- matrix(
-    data = NA, nrow = length(namesvector), ncol = length(namesvector), byrow = FALSE,
-    dimnames = list(namesvector, namesvector)
-  )
-
-  for (i in 1:length(namesvector)) {
-    var1 <- as.matrix(datas[namesvector[i]])
-
-    for (j in which(namesvector != namesvector[i])) {
-      var2 <- as.matrix(datas[namesvector[j]])
-      tutu <- chisq.test(table(x = var1, y = var2), simulate.p.value = TRUE)
-      # cat(namesvector[i], "VS", namesvector[j], "\n");
-      # print(tutu)
-      # cat(rep("-", getOption("width"))); cat("\n")
-      if (tutu$p.value < 0.05) m1[i, j] <- round(tutu$p.value, 4)
-      m2[i, j] <- tutu$statistic
-    }
-  }
-
-  m1[lower.tri(m1)] <- "-"
-  m1 <- as.data.frame(m1)
-  m2[lower.tri(m2)] <- "-"
-  m2 <- as.data.frame(m2)
-  return(list("pvalues" = m1, "statistics" = m2))
-}
-
-chtest_all = chtest(icu, qualits_all)
-
-#chall_vs_1 = chtest(icuvs_1$calib, qualits_all)
-
-##visualisation of all stuff with or without sampling
-#tibble::as.tibble(cbind.data.frame("names" = rownames(chtest_all[["pvalues"]]),chtest_all[["pvalues"]]))
-correl = tibble::as.tibble(cbind.data.frame("names" = rownames(chtest_all[["pvalues"]]),chtest_all[["pvalues"]]))
-
-correl = as.data.frame(correl[,-1])
-rownames(correl) <- colnames(correl)
-
-matable <- xtable(x = correl , label = "quali_cor")
-# Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
-print(matable, file = "fig/quali_cor.tex", size = "tiny", NA.string = "NA",
-      table.placement = "!t",
-      floating = FALSE,
-      caption.placement="top",
-      include.rownames = TRUE,
-      include.colnames = TRUE,
-      latex.environments = "center")
-# On veut des '.' au lieu des des NA
-@
-
-\begin{table}[h]
-  \begin{center}
-  \input{fig/quali_cor.tex}
-  \end{center}
-  \caption{\textbf{P-valeurs des tests de $\chi^2$ par paires de variables qualitatives sur 70\% du jeu de donnée.} Les cases avec `NA` indiquent des valeurs > 0.05.}
-  \label{table:quali_cor}
-\end{table}     
-
-Il apparaît qu'effectuer ces tests de $\chi^2$ sur un plus petit jeu de données entraîne une dimition du nombre de corrélations. Pour les corrélations restantes après un échantillonnage, la variable `SER` est corrélée au plus d'autres variables. De même `PCO` est corrélée à 4 autres variables (Table \ref{table:quali_cor}). Il existe d'autres variables corrélées, mais il semble préférable de limiter le nombre de variables explicatives et de favoriser le choix de variables corrélées à plusieurs autres et dont les classes sont les moins déséquilibrées possibles (Figure \ref{fig:visual}). Parmis les variables qualitatives seront donc conservés : `SER`, `INF`, `PRE`, `TYP` et `PCO`.
-
-<<quanti_cor , echo = F, eval= F, results= hide>>=
-quantit <- c("HRA", "SYS")
-# 1) Check normality -- graphically
-
-# ggqqplot(icu, x = quantit, combine = TRUE) # compares variable distribution with a theoretical normal distr
-
-# 2) Check normality -- test SW
-hra_shap <- shapiro.test(icu$HRA)
-sys_shap <- shapiro.test(icu$SYS)
-# confirmé normalité - on peut faire cor.test sous hypothèse distrib paramétrique (Pearson)
-var_corelations <- cor(icu[quantit])
-var_pvalues <- var_corelations ##### pourquoi ces deux lignes?????
-var_pvalues[] <- NA
-for (i in (2:nrow(var_corelations))) {
-  for (j in (1:(i - 1)))
-  {
-    # cat("\ncor.test entre",colnames(var_corelations)[i],"et",colnames(var_corelations)[j])
-    var_pvalues[i, j] <- round(cor.test(icu[, colnames(var_corelations)[i]],
-      icu[, colnames(var_corelations)[j]],
-      method = "kendall",
-      alternative = "two.sided"
-    )$p.value,
-    digits = 4
-    )
-  }
-}
-var_pvalues[2,1] # pas de corrélation significative
-@
-
-Afin de limiter le nombre de variables, une analyse de corrélations entre les variables quantitatives est aussi réalisé. Les deux variables `HRA` (Rythme cardiaque) et `SYS` (Pression systolique) ne présentent pas des répartitions suivant une loi normale, avec une P-valeur au test de Shapiro de respectivement \Sexpr{round(3.14, 1)} et \Sexpr{round(3.14, 1)}, permettant de rejeter H0. Un test de corrélation de Kendall ne permet pas de souligner une corrélation entre les deux variables, avec une p-valeur de \Sexpr{round(3.14, 1)}.
-
-<<tri , echo = F, eval=F, results=hide>>=
-icu = icu[,c(2:4,6,9,11:14,18)]
-@
-
-À vue des coïncidences entre variables, les modèles considerés partiront de sept variables pour expliquer la variable binomiale `STA`, qui indique la survie ou non du patient à l'issue de son séjour en service de soins intensifs. Ces variables sont : le sexe du patient (`GENDER`), son âge (`AGE`), la raison de son admission -médicale / chirurgicale- (`SER`), la présence d'une infection lors de l'admission (`INF`), une précédente admission dans les derniers 6 mois (`PRE`), la nature de l'admission -prévue / urgence- (`TYP`) et la pression en dioxide de carbone dans le sang à l'admission (`PCO`). Le choix du meilleur modèle sera d'abord effectué sur un sample du 70\% du jeu de données, ensuite généralisés à la totalité des données. 
-
-\subsection*{Modélisation}
-
-La selection de modèle avec plusieurs variables se fait par selection stepwise, au moyen de la fonction \verb|stepAIC| du package \verb|MASS|. Cette analyse est portée sur un jeu de donnée échantillonné ainsi que sur l'ensemble du jeu de données. Dans les deux cas, les variables choisies comme celles les plus discriminantes pour la survie sont l'âge de l'individu, la pression systolique lors de l'admission et le type d'admission. 
-<<step, echo = F, eval=F>>=
-# sample
-glmBase_s <- glm(STA ~ 1, data = icuvs_1, family = "binomial")
-stepwise_s <- stepAIC(glmBase_s, scope = list(
-  upper = ~ AGE * HRA * SYS * INF * SER * GENDER * PRE * TYP * PCO,
-  lower = ~1
-), direction = "both", trace = F)
-cat("=================[sample data]=================")
-stepwise_s
-
-# total
-glmBase_t <- glm(STA ~ 1, data = icu, family = "binomial")
-stepwise_t <- stepAIC(glmBase_t, scope = list(
-  upper = ~ AGE * HRA * SYS * INF * SER * GENDER * PRE * TYP * PCO,
-  lower = ~1
-), direction = "both", trace = F)
-cat("=================[total data]=================")
-stepwise_t
-@
-
-
-<<model_70%, echo = F, eval=F, results=hide>>=
-# avec les variables choisies par le stepwise: TYP, AGE, SYS, AGE:SYS
-mod_s = glm(STA ~ AGE + TYP + SYS, data = icuvs_1, family = "binomial")
-summary(mod_s)
-anova(mod_s, test = "Chisq")
-
-mod_s1 <- glm(STA ~ AGE, data = icuvs_1, family = "binomial")
-summary(mod_s1)
-anova(mod_s1, test = "Chisq")
-
-mod_s2 <- glm(STA ~ SYS, data = icuvs_1, family = "binomial")
-summary(mod_s2)
-anova(mod_s2, test = "Chisq")
-
-mod_s3 <- glm(STA ~ TYP, data = icuvs_1, family = "binomial")
-summary(mod_s3)
-anova(mod_s3, test = "Chisq")
-
-rs_1 = anova(mod_s, mod_s1, test = "Chisq")
-rs_2 = anova(mod_s, mod_s2, test = "Chisq")
-rs_3 = anova(mod_s, mod_s3, test = "Chisq")
-
-results1 = data.frame(
-  "AGE" = c(rs_1$`Resid. Dev`[2],rs_1$`Resid. Dev`[1]), 
-"SYS" = c(rs_2$`Resid. Dev`[2],rs_2$`Resid. Dev`[1]), 
-"TYP" = c(rs_3$`Resid. Dev`[2],rs_3$`Resid. Dev`[1]),
-row.names = c("Dév. modèle 1 variables", "Dév. modèle 3 variables"))
-
-# pour tout le jeu de données
-mod = glm(STA ~ AGE + TYP + SYS, data = icu, family = "binomial")
-summary(mod)
-anova(mod, test = "Chisq")
-
-mod1 <- glm(STA ~ AGE, data = icu, family = "binomial")
-summary(mod1)
-anova(mod1, test = "Chisq")
-
-mod2 <- glm(STA ~ SYS, data = icu, family = "binomial")
-summary(mod2)
-anova(mod2, test = "Chisq")
-
-mod3 <- glm(STA ~ TYP, data = icu, family = "binomial")
-summary(mod3)
-anova(mod3, test = "Chisq")
-
-r1 = anova(mod, mod1, test = "Chisq")
-r2 = anova(mod, mod2, test = "Chisq")
-r3 = anova(mod, mod3, test = "Chisq")
-
-results2 = data.frame(
-  "AGE" = c(r1$`Resid. Dev`[2],r1$`Resid. Dev`[1]), 
-"SYS" = c(r2$`Resid. Dev`[2],r2$`Resid. Dev`[1]), 
-"TYP" = c(r3$`Resid. Dev`[2],r3$`Resid. Dev`[1]),
-row.names = c("Dév. modèle 1 variables", "Dév. modèle 3 variables"))
-
-
-matable <- xtable(x = results1 , label = "result1")
-# Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
-print(matable, file = "fig/result1.tex", NA.string = "NA",
-      table.placement = "!t",
-      floating = FALSE,
-      caption.placement="top",
-      include.rownames = TRUE,
-      include.colnames = TRUE,
-      latex.environments = "center")
-
-
-matable <- xtable(x = results2 , label = "result2")
-# Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
-print(matable, file = "fig/result2.tex", NA.string = "NA",
-      table.placement = "!t",
-      floating = FALSE,
-      caption.placement="top",
-      include.rownames = TRUE,
-      include.colnames = TRUE,
-      latex.environments = "center")
-@
-
-Des analyses successifs du test de Wald et du test de rapport de vraisemblance confirment que les variables 'AGE', 'SYS' ou 'TYP' séparémment ne servent pas à expliquer assez de déviation des résidus: le modèle avec les trois variables ensemble est significativement meilleur que les trois modèles n'incluant que l'une d'elles à la fois, avec des moindres valeurs de déviation des résidus pour toutes les trois. 
-
-\begin{table}[h]
-  \begin{center}
-  \input{fig/result1.tex}
-  \end{center}
-  \caption{Déviation des résidus selon les modèles utilisés pour chacune des variables dans le cas du jeu de donnée échantillonné.}
-  \label{table:result1}
-\end{table}
-
-De cette manière, on peut conclure que le modèle doit intégrer ces trois variables pour décrire la plupart des données. Le meilleur modèle à aborder est donc : \verb|STA ~ TYP + AGE * SYS |.  
-
-<<validation model 70% , echo = F, eval=F, results=hide>>=
-# d'abord pour SAMPLE :::::::::::::::::::::::::::::::::::::::::::::::
-mod_s = glm(STA ~ AGE + TYP + SYS, data = icuvs_1, family = "binomial")
-
-# d'après pdf regression logistique
-rh1_s = hoslem.test(icuvs_1$STA, fitted(mod_s))
-
-# Analyse des résidus: d'après pdf regression logistique diapo 34 - on confirme distribution normale
-# mais ça ne sert plus à grande chose à part ça
-plot(rstudent(mod_s), type = "p", ylim = c(-3,3))
-abline(h = 2, col = "red")
-abline(h = -2, col = "red")
-
-
-# distance de Cook: y a-t-il des points très influents ? 
-plot(cooks.distance(mod_s), xlab = "Individus", ylab = "")
-cooks.distance(mod_s)[cooks.distance(mod_s)>1]
-@
-
-\subsection*{Validation du modèle}
-Le test de Hosmer \& Lemeshow soutient l'hypothèse que le modèle est compatible avec les données du sample 70\%, même si la p-valeur est proche de 0.05 (\Sexpr{round(3.14, 1)}). La distance de Cook ne montre pas de points influents, ce qui nous fait accepter les observations du dataset. 
-
-\begin{figure}
-\vspace{-20pt}
-\begin{center}
-\includegraphics{fig/Rplot.png}
-\caption{Répartitions des distances de Cook pour le jeu de données échantillonné.}
-  \label{table:cooks}
-\end{center}
-\end{figure}
-
-<<performance model 70%, echo = F, eval=F, results=hide>>=
-library(pROC)
-# d'abord pour SAMPLE :::::::::::::::::::::::::::::::::::::::::::::::
-pred.test = predict(mod_s)
-roc_test = roc(icuvs_1$STA, pred.test)
-pred.test.bin = ifelse(pred.test>0.5, 1, 0) # transformation en binaire
-
-counting_s = table(icuvs_1$STA, pred.test.bin)
-
-plot(roc_test)
-auc_s = roc_test$auc # il y a plus de surface en dessous de la courbe: donc plus d'erreurs... étonnant ¬¬
-
-
-# puis pour TOUT JEU DONNÉES  :::::::::::::::::::::::::::::::::::::::::::::::
-pred_tot = predict(mod)
-roc_tot = roc(icu$STA, pred_tot)
-pred_tot_bin = ifelse(pred_tot>0.5, 1, 0) # transformation en binaire
-
-counting_t = table(icu$STA, pred_tot_bin)
-
-plot(roc_tot)
-auc_t = roc_tot$auc
-@
-
-\subsection*{Performance du modèle}
-La surface en dessous de la courbe ROC (dîte valeur AUC) est de \Sexpr{round(3.14, 1)}. Ce modèle ne semble pas être très performant, vu la grande surface en dessous de la courbe et la valeur de sensibilité de \Sexpr{round(3.14, 1)}, laquelle fait preuve du grand nombre de faux positifs. Les valeurs de AUC et de sensibilité s'améliorent relativement pour la totalité du jeu de données, avec un AUC de \Sexpr{round(3.14, 1)} et une sensibilité de \Sexpr{round(3.14, 1)}.  
-
-<<model pour 100% et graph , echo = F, eval=F, results=hide>>=
-# d'abord pour SAMPLE :::::::::::::::::::::::::::::::::::::::::::::::
-mod_GOOD = glm(STA ~ AGE * SYS + TYP, data = icu, family = "binomial")
-
-# Analyse des résidus: d'après pdf regression logistique diapo 34 - on confirme distribution normale
-# mais ça ne sert plus à grande chose à part ça
-plot(rstudent(mod_GOOD), type = "p", ylim = c(-3,3))
-abline(h = 2, col = "red")
-abline(h = -2, col = "red")
-
-
-# distance de Cook: y a-t-il des points très influents ? non plus
-plot(cooks.distance(mod_GOOD))
-cooks.distance(mod_GOOD)[cooks.distance(mod_GOOD)>1]
-
-
-# Analyses performance du modèle
-pred_tot_g = predict(mod_GOOD)
-roc_tot_g = roc(icu$STA, pred_tot_g)
-pred_tot_gbin = ifelse(pred_tot_g>0.5, 1, 0) # transformation en binaire
-
-counting_t_g = table(icu$STA, pred_tot_gbin)
-
-plot(roc_tot_g)
-auc_t_g = roc_tot_g$auc
-
-
-#graphique
-par(mfrow= c(2,1))
-pred.tot2 = round(pred_tot) # complètement à la rache
-plot(icu$STA, col = "green", main = "Sans effets croisés")
-points(pred.tot2, col = "red")
-
-
-pred.tot2_g = round(pred_tot_g) # complètement à la rache
-plot(icu$STA, col = "green", main = "Avec effets croisés")
-points(pred.tot2_g, col = "red") 
-# bon... pas terrible
-
-@
-
-Le choix du modèle était bien basé vu que, pour le sample 70\%, les modèles contenant les trois variables 'AGE', 'TYP' et 'SYS' servaient à expliquer plus de variabilité des données que ceux ne contenant qu'une d'elles. C'est aussi le cas si l'on teste ces mêmes conclusions sur le jeu de données complet. \
-
-\begin{table}[h]
-  \begin{center}
-  \input{fig/result2.tex}
-  \end{center}
-  \caption{Déviation des résidus selon les modèles utilisés pour chacune des variables dans le cas du jeu de donnée entier.}
-  \label{table:result2}
-\end{table} 
-
-C'est vrai que l'approche stepwise pour le dataset complet propose des effets croisés entre l'âge et la pression systolique comme explication d'une part de la variabilité des données. Une fois ajouté le terme des effets croisés, les valeurs de AUC et de sensibilité s'améliorent relativement avec un AUC de \Sexpr{round(3.14, 1)} et une sensibilité de \Sexpr{round(3.14, 1)}.
-
-
-\subsection*{Conclusion}
-
-L'analyse permet donc de faire ressortir des variables intéressantes sur la survie des patients aux services de soins intensifs. Cependant cette analyse n'est pas exhaustive et la faible différence de modèles avant et après échantillonnage questionne sur la qualité du jeu de donnée, et sa taille réduite. Il faut également remarquer que le modèle proposé est réduit à une régression logistique et que d'autres interractions peuvent avoir leurs importances dans la survie du patient.
-
-%\SweaveInput{child_test.Rnw}
-
-%\end{multicols}
-\fi
-
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% % Références
-% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% %\newpage
-% \begin{multicols}{2}
-% 
-% \subsection*{Bibliographie}
-% \bibliographystyle{authordate1}
-% \bibliography{../../../../Mendeley/Markov}
-% 
-% \end{multicols}
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Annexes
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% \newpage
-% \begin{landscape}
-% 
-% \begin{annexe}
-% 	\centering
-% \rowcolors{2}{white}{gray!25}
-% \resizebox{27cm}{!}{%
-% 	\begin{tabular}{cccccccccccc}
-% 	\toprule
-% Species &Locality &Code &Morph &Collector &Date &Longitude &Latitude &Altitude&Reads raw &Reads trimmed &Voucher \\
-% 	\midrule
-% P. apennina* &Sella del Marmagna, Italy &AMB &Short-styled &F. Boucher/L. Gallien &30/05/14 & 10.00575 & 44.3978 &1610&6885928&6486849&Photo \\
-% P. apennina &Monte Marmagna, Italy &AML &Long-styled &F. Boucher/L. Gallien &30/05/14 & 9.99731 & 44.39672 &1825&1856867&1663377&Photo \\
-% P. apennina &Monte Orsaro, Italy &AOL &Long-styled &F. Boucher/L. Gallien &30/05/14 & 9.99666 & 44.39883 &1818&3494081&3230296&Photo \\
-% P. cottia &Below locus classicus, Italy &CS1 & NA &F. Boucher &23/07/14 & 7.0716 & 44.9271 &1159&5127416&4814386&Photo \\
-% 	\bottomrule
-% 	\end{tabular}}
-% 	\caption{\textbf{Individus séquencés pour cette étude}. D'après les informations de \citet{Boucher2016a}.}
-% 	\label{table_ind}
-% \end{annexe}
-% \end{landscape}
-
 \end{document}
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% Figures et raccoucis!
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%{\let\thefootnote\relax\footnote{{ \textit{Primula hirsuta},  Crédit photo : Florian Boucher}}}
-
-<<table, echo = FALSE, eval=FALSE, results=hide>>=
-matable <- xtable(x = summary(icuf[,-c(1,19:21)]) , label = "tset",
-caption = "Lblablabla")
-# Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
-print(matable, file = "fig/tset.tex", size = "tiny", NA.string = "-")
-# On veut des '.' au lieu des des NA
-@
-
-% \input{fig/tset.tex}
-% Je teste de mettre un tableau et ça tourne mal \ref{tset}.
-
-% # 1. id : identifiant du sujet. Chaque observation a un identifiant unique soit une observation
-% # par individu.
-% # 2. STA : Vital Status (0=Lived / 1=Died)
-% # 3. AGE : Age (Years)
-% # 4. GENDER : Gender (0 = Male / 1 = Femal)
-% # 5. RACE : Race (1 = White / 2 = Black / 3 = Other)
-% # 6. SER : Service at ICU Admission (0 = Medical / 1 = Surgical)
-% # 7. CAN : Cancer Part of Present Problem (0 = No / 1 = Yes)
-% # 8. CRN : History of chronic renal failure (0 = No / 1= Yes)
-% # 9. INF : Infection Probable at ICU Admission (0 = No / 1= Yes)
-% # 10. CPR : CPR Prior to ICU Admission (0 = No / 1= Yes)
-% # 11. SYS : Systolic Blood Pressure at ICU Admission mm Hg
-% # 12. HRA : Heart Rate at ICU Admission Beats/min
-% # 13. PRE : Previous Admission to an ICU within 6 Months (0 = No / 1= Yes)
-% # 14. TYP : Type of Admission (0 = Elective / 1 = Emergency)
-% # 15. FRA : Long Bone, Multiple, Neck, Single Area, or Hip Fracture (0 = No / 1= Yes)
-% # 16. PO2 : from Initial Blood Gases (0 = > 60 / 1 = < 60)
-% # 17. PH : from Initial Blood Gases (0 => 7.25 / 1 =< 7.25)
-% # 18. PCO2 from initial Blood Gases (0 = < 45 / 1 = > 45)
-% # 19. BIC : Bicarbonate from InitialBlood Gases (0 = > 18 / 1 = < 18)
-% # 20. CRE : Creatinine from Initial Blood Gases (0 = < 2.0 / 1 = > 2.0)
-% # 21. LOC : Level of Consciousness at ICU Admission (O = No Coma or Stupor / 1 = Deep / 2 = Coma)
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%% notes pour tableau
-% \begin{table}[h]
-% \caption{A table with notes in the end}
-%   \begin{center}
-%      \begin{threeparttable}
-%        % INPUT YOUR TEX HERE :
-%        \input{fig/quali_cor.tex}
-%      \begin{tablenotes}
-%        \item[1] aaaa; \item[2] bbbb
-%      \end{tablenotes}
-%     \end{threeparttable}
-%    \end{center}
-%  \label{table:tablewithnotes}
-%  \end{table}   

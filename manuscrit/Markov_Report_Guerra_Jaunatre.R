@@ -22,13 +22,14 @@ if("BeeMarkov" %in% installed.packages()) {
 }
 
 library(seqinr)
+rerun = FALSE
 
 
 ###################################################
 ### code chunk number 2: working (eval = FALSE)
 ###################################################
 ## setwd("manuscrit")
-## rerun = TRUE
+## 
 
 
 ###################################################
@@ -100,161 +101,161 @@ print(matable, file = "fig/tab_trans.tex",size = "tiny", NA.string = "NA",
 
 
 ###################################################
-### code chunk number 4: threshold (eval = FALSE)
+### code chunk number 4: threshold
 ###################################################
-## quality <- function(file, # fichier
-##                     pos_training = NULL, # file to train with for positive
-##                     neg_training = NULL, # file to train with for negative
-##                     trans_pos = NULL, #transition matrice pos
-##                     trans_neg = NULL, #transition matrice pos
-##                     l_word_pos = 1, # word lenght for transition table positif
-##                     l_word_neg = 1, # word length for transition table negatif
-##                     n_train = 1, # number of sequences to train with
-##                     n_seq = 1, # number of sequences to analyse
-##                     quiet = FALSE
-## ){
-##   if(is.null(c(trans_pos,trans_neg))){
-##     trans_pos <-transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type ="+")
-##     trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-")
-##   } 
-##   
-##   seq <-seqinr::read.fasta(file)
-##   Nseq <- length(seq)
-##   
-##   if(Nseq < n_seq){ # check if user want to input too many seq in the matrix learning
-##     stop(paste("n_seq is larger than the number of sequence in this file ( ",Nseq," sequences for this file).", sep = ""))
-##   }
-##   
-##   result <- data.frame(VP = rep(FALSE,n_seq),
-##                        FN = rep(TRUE,n_seq),
-##                        pos = rep(NA,n_seq),
-##                        neg = rep(NA,n_seq)
-##   )
-##   
-##   p_init_pos = log(1/4^l_word_pos)
-##   p_init_neg = log(1/4^l_word_neg)
-##   
-##   if(!quiet) {cat('      ============ Computing sensi and speci for the test sequences ============       \n')
-##     pb <- utils::txtProgressBar(min = 0, max = n_seq, style = 3)}
-##   for(i in 1:n_seq){
-##     if(!quiet) utils::setTxtProgressBar(pb, i)
-##     n_word_pos <-seqinr::count(seq[[i]], l_word_pos)
-##     n_word_neg <-seqinr::count(seq[[i]], l_word_neg)
-##     result$pos[i] <- p_init_pos + sum( trans_pos * n_word_pos )
-##     result$neg[i] <- p_init_neg + sum( trans_neg * n_word_neg )
-##     if(result$pos[i] > result$neg[i]){
-##       result$VP[i] <- TRUE ; result$FN[i] <- FALSE 
-##     } else { 
-##       result$VP[i] <- FALSE ; result$FN[i] <- TRUE
-##     }
-##   }
-##   if(!quiet) close(pb)
-##   
-##   tmp <- colSums(result[,1:2])
-##   return(tmp)
-## }
-## 
-## threshold <- function(pos_test, # fichier
-##                      neg_test,
-##                      pos_training, # file to train with for positive
-##                      neg_training, # file to train with for negative
-##                      pos_seq = c(1:2),
-##                      neg_seq = c(1:2),
-##                      n_train = 1, # number of sequences to train with
-##                      n_seq = 1 # number of sequences to analyse
-## ){
-##   
-##   # choix =utils::menu(c("yes","no"),
-##   #              title = "You will launch long computation, do you wish to procede further ?")
-##   # if (choix ==1) cat("\n      ============ Go take a good coffee ============       \n\n")
-##   # if (choix ==2) stop("You stopped the computations")
-##   
-##   
-##   trans_pos <- list()
-##   trans_neg <- list()
-##   
-##   cat('\n      ============ Training modeles ============       \n\n')
-##   for(i in pos_seq){
-##     trans_pos[[i]] <- transition(file = pos_training, n_seq = n_train, l_word = i, type = "+")
-##   }
-##   cat('\n')
-##   for(j in neg_seq){
-##     trans_neg[[j]] <- transition(file = neg_training, n_seq = n_train, l_word = j, type = "-")
-##   }
-##   
-##   cat('\n      ============ Training modeles ============       \n\n')    
-##   sensi <- speci <- matrix(rep(0,length(pos_seq)*length(neg_seq)),ncol = length(pos_seq),nrow = length(neg_seq))
-##   for(i in pos_seq){
-##     for(j in neg_seq){
-##       cat('\n')
-##       cat(paste("      ============ Model M+ (",i,"/",j,") ============        \n", sep = ""))
-##       pos <- quality(file = pos_test, # fichier
-##                      trans_pos = trans_pos[[i]], #transition matrice pos
-##                      trans_neg = trans_neg[[j]], #transition matrice neg
-##                      l_word_pos = i, # transition table positif
-##                      l_word_neg = j, # transition table negatif
-##                      n_train = n_train, # number of sequences to train with
-##                      n_seq = n_seq, # number of sequences to analyse
-##                      quiet = TRUE
-##       )
-##       cat(paste("      ============ Model M- (",i,"/",j,") ============        \n", sep = ""))
-##       neg <- quality(file = neg_test, # fichier
-##                      trans_pos = trans_pos[[i]], #transition matrice pos
-##                      trans_neg = trans_neg[[j]], #transition matrice neg
-##                      l_word_pos = i, # transition table positif
-##                      l_word_neg = j, # transition table negatif
-##                      n_train = n_train, # number of sequences to train with
-##                      n_seq = n_seq, # number of sequences to analyse
-##                      quiet = TRUE
-##       )
-##       
-##       sensi[i,j] <- pos[1] / sum(pos)
-##       speci[i,j] <- neg[2] / sum(neg)
-##       
-##     }
-##   }
-##   
-##   cat(paste("      ============ Come back from your coffee ============        \n", sep = ""))
-##   colnames(sensi) <- colnames(speci) <- paste("-",neg_seq, sep="")
-##   rownames(sensi) <- rownames(speci) <- paste("+",pos_seq, sep="")
-##   
-##   final <-list(sensi,speci) ; names(final) = c("sensi","speci")
-##   
-##   return(final)
-## }
-## 
+quality <- function(file, # fichier
+                    pos_training = NULL, # file to train with for positive
+                    neg_training = NULL, # file to train with for negative
+                    trans_pos = NULL, #transition matrice pos
+                    trans_neg = NULL, #transition matrice pos
+                    l_word_pos = 1, # word lenght for transition table positif
+                    l_word_neg = 1, # word length for transition table negatif
+                    n_train = 1, # number of sequences to train with
+                    n_seq = 1, # number of sequences to analyse
+                    quiet = FALSE
+){
+  if(is.null(c(trans_pos,trans_neg))){
+    trans_pos <-transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type ="+")
+    trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-")
+  } 
+  
+  seq <-seqinr::read.fasta(file)
+  Nseq <- length(seq)
+  
+  if(Nseq < n_seq){ # check if user want to input too many seq in the matrix learning
+    stop(paste("n_seq is larger than the number of sequence in this file ( ",Nseq," sequences for this file).", sep = ""))
+  }
+  
+  result <- data.frame(VP = rep(FALSE,n_seq),
+                       FN = rep(TRUE,n_seq),
+                       pos = rep(NA,n_seq),
+                       neg = rep(NA,n_seq)
+  )
+  
+  p_init_pos = log(1/4^l_word_pos)
+  p_init_neg = log(1/4^l_word_neg)
+  
+  if(!quiet) {cat('      ============ Computing sensi and speci for the test sequences ============       \n')
+    pb <- utils::txtProgressBar(min = 0, max = n_seq, style = 3)}
+  for(i in 1:n_seq){
+    if(!quiet) utils::setTxtProgressBar(pb, i)
+    n_word_pos <-seqinr::count(seq[[i]], l_word_pos)
+    n_word_neg <-seqinr::count(seq[[i]], l_word_neg)
+    result$pos[i] <- p_init_pos + sum( trans_pos * n_word_pos )
+    result$neg[i] <- p_init_neg + sum( trans_neg * n_word_neg )
+    if(result$pos[i] > result$neg[i]){
+      result$VP[i] <- TRUE ; result$FN[i] <- FALSE 
+    } else { 
+      result$VP[i] <- FALSE ; result$FN[i] <- TRUE
+    }
+  }
+  if(!quiet) close(pb)
+  
+  tmp <- colSums(result[,1:2])
+  return(tmp)
+}
+
+threshold <- function(pos_test, # fichier
+                     neg_test,
+                     pos_training, # file to train with for positive
+                     neg_training, # file to train with for negative
+                     pos_seq = c(1:2),
+                     neg_seq = c(1:2),
+                     n_train = 1, # number of sequences to train with
+                     n_seq = 1 # number of sequences to analyse
+){
+  
+  # choix =utils::menu(c("yes","no"),
+  #              title = "You will launch long computation, do you wish to procede further ?")
+  # if (choix ==1) cat("\n      ============ Go take a good coffee ============       \n\n")
+  # if (choix ==2) stop("You stopped the computations")
+  
+  
+  trans_pos <- list()
+  trans_neg <- list()
+  
+  cat('\n      ============ Training modeles ============       \n\n')
+  for(i in pos_seq){
+    trans_pos[[i]] <- transition(file = pos_training, n_seq = n_train, l_word = i, type = "+")
+  }
+  cat('\n')
+  for(j in neg_seq){
+    trans_neg[[j]] <- transition(file = neg_training, n_seq = n_train, l_word = j, type = "-")
+  }
+  
+  cat('\n      ============ Training modeles ============       \n\n')    
+  sensi <- speci <- matrix(rep(0,length(pos_seq)*length(neg_seq)),ncol = length(pos_seq),nrow = length(neg_seq))
+  for(i in pos_seq){
+    for(j in neg_seq){
+      cat('\n')
+      cat(paste("      ============ Model M+ (",i,"/",j,") ============        \n", sep = ""))
+      pos <- quality(file = pos_test, # fichier
+                     trans_pos = trans_pos[[i]], #transition matrice pos
+                     trans_neg = trans_neg[[j]], #transition matrice neg
+                     l_word_pos = i, # transition table positif
+                     l_word_neg = j, # transition table negatif
+                     n_train = n_train, # number of sequences to train with
+                     n_seq = n_seq, # number of sequences to analyse
+                     quiet = TRUE
+      )
+      cat(paste("      ============ Model M- (",i,"/",j,") ============        \n", sep = ""))
+      neg <- quality(file = neg_test, # fichier
+                     trans_pos = trans_pos[[i]], #transition matrice pos
+                     trans_neg = trans_neg[[j]], #transition matrice neg
+                     l_word_pos = i, # transition table positif
+                     l_word_neg = j, # transition table negatif
+                     n_train = n_train, # number of sequences to train with
+                     n_seq = n_seq, # number of sequences to analyse
+                     quiet = TRUE
+      )
+      
+      sensi[i,j] <- pos[1] / sum(pos)
+      speci[i,j] <- neg[2] / sum(neg)
+      
+    }
+  }
+  
+  cat(paste("      ============ Come back from your coffee ============        \n", sep = ""))
+  colnames(sensi) <- colnames(speci) <- paste("-",neg_seq, sep="")
+  rownames(sensi) <- rownames(speci) <- paste("+",pos_seq, sep="")
+  
+  final <-list(sensi,speci) ; names(final) = c("sensi","speci")
+  
+  return(final)
+}
 
 
+
 ###################################################
-### code chunk number 5: seuil (eval = FALSE)
+### code chunk number 5: seuil
 ###################################################
-## if("final.RData" %in% list.files("fig/") && !rerun){
-##   load("fig/final.RData")
-## }else{
-##   final <- threshold("../raw_data/mus_cpg_test.fa", # fichier
-##   "../raw_data/mus_tem_test.fa",
-##   "../raw_data/mus_cpg_app.fa", # file to train with for positive
-##   "../raw_data/mus_tem_app.fa", # file to train with for negative
-##   pos_seq = c(1:2),
-##   neg_seq = c(1:2),
-##   n_train = 1160, # number of sequences to train with
-##   n_seq = 1163 # number of sequences to analyse
-## )
-## save(final,file = "fig/final.RData")
-## }
-## 
-## table <- cbind(melt(final$sensi), melt(final$speci)[, 3])
-## colnames(table) <- c("M", "m", "Sensi", "Speci")
-## table$score <- table$Sensi + table$Speci
-## 
-## visual <- ggplot(table, aes(M, m)) +
-##   geom_raster(aes(fill = score), hjust = 0.5, vjust = 0.5, interpolate = FALSE) +
-##   geom_contour(aes(z = score)) + xlab("CpG+") + ylab("CpG-")
-## visual
-## ggsave('visual.pdf', plot = visual, device = "pdf", path = 'fig/',scale = 3, width = 7, height = 4, units = "cm", limitsize = T)
-## rm(visual)
-## 
-## table[which(table$tot == max(table$tot)),]
+if("final.RData" %in% list.files("fig/") && !rerun){
+  load("fig/final.RData")
+}else{
+  final <- threshold("../raw_data/mus_cpg_test.fa", # fichier
+  "../raw_data/mus_tem_test.fa",
+  "../raw_data/mus_cpg_app.fa", # file to train with for positive
+  "../raw_data/mus_tem_app.fa", # file to train with for negative
+  pos_seq = c(1:6),
+  neg_seq = c(1:6),
+  n_train = 1160, # number of sequences to train with
+  n_seq = 1163 # number of sequences to analyse
+)
+save(final,file = "fig/final.RData")
+}
+
+table <- cbind(melt(final$sensi), melt(final$speci)[, 3])
+colnames(table) <- c("M", "m", "Sensi", "Speci")
+table$score <- table$Sensi + table$Speci
+
+visual <- ggplot(table, aes(M, m)) +
+  geom_raster(aes(fill = score), hjust = 0.5, vjust = 0.5, interpolate = FALSE) +
+  geom_contour(aes(z = score)) + xlab("CpG+") + ylab("CpG-")
+visual
+ggsave('visual.pdf', plot = visual, device = "pdf", path = 'fig/',scale = 3, width = 7, height = 4, units = "cm", limitsize = T)
+rm(visual)
+
+table[which(table$tot == max(table$tot)),]
 
 
 ###################################################
@@ -282,371 +283,373 @@ print(matable, file = "fig/trans_mod.tex",size = "tiny", NA.string = "NA",
 
 
 ###################################################
-### code chunk number 7: github_install (eval = FALSE)
+### code chunk number 7: viterbi
+###################################################
+viterbi <- function(file,
+                    pos_training = "../raw_data/mus_cpg_app.fa", # file to train with for positive
+                    neg_training = "../raw_data/mus_tem_app.fa", # file to train with for negative
+                    l_word_pos = 1,
+                    l_word_neg = 1,
+                    n_train = 1160,
+                    n_ana = 1,
+                    l_c = 1000, # length coding
+                    l_nc = 125000 # length non-coding
+) {
+  trans_pos <- transition(file = pos_training, n_seq = n_train, l_word = l_word_pos, type = "+")
+  trans_neg <- transition(file = neg_training, n_seq = n_train, l_word = l_word_neg, type = "-")
+  
+  seq <- seqinr::read.fasta(file)
+  if (n_ana > 1) stop("Analysis for multiple files is not implemented yet")
+  
+  raw_seq <- seq[[1]]
+  long <- length(raw_seq)
+  
+  beg <- max(l_word_pos, l_word_neg)
+  
+  # compute p_initial and transition matrix for markov
+  pos_init <- neg_init <- log(0.5)
+  l_c <- 1 / l_c
+  l_nc <- 1 / l_nc
+  
+  trans_mod <- log(matrix(c(
+    1 - l_c, l_nc,
+    l_c, 1 - l_nc
+  ),
+  ncol = 2, nrow = 2
+  ))
+  colnames(trans_mod) <- rownames(trans_mod) <- c("c", "nc")
+  
+  # initialisation
+  ncol <- 7
+  proba <- matrix(rep(NA, long * ncol), ncol = ncol)
+  colnames(proba) <- c("M+", "M-", "model", "length", "rep_length", "begin", "end")
+  
+  # time explode if it is not a matrix anymore !!!
+  # proba <- as.data.frame(proba)
+  
+  # old version is v2 takes too long
+  # v1 = function(){
+  # trans_pos[which(names(trans_pos)==paste(raw_seq[(beg-l_word_pos+1):beg],collapse = ""))]
+  # }
+  # v2 = function(){
+  # min(count(raw_seq[(beg-l_word_pos+1):beg], l_word_pos) * trans_pos)
+  # }
+  # system.time(v1())
+  # system.time(v2())
+  
+  # compute first base and initiate Viterbi
+  proba[beg, "M+"] <- trans_pos[which(names(trans_pos) == paste(raw_seq[(beg - l_word_pos + 1):beg], collapse = ""))] + pos_init
+  proba[beg, "M-"] <- trans_neg[which(names(trans_neg) == paste(raw_seq[(beg - l_word_neg + 1):beg], collapse = ""))] + neg_init
+  if (proba[beg, "M+"] > proba[beg, "M-"]) {
+    proba[beg, "model"] <- 1
+  } else {
+    proba[beg, "model"] <- 2
+  }
+  proba[beg, c("length", "rep_length")] <- 1
+  tmp <- proba[beg, c(6, 7)] <- beg
+  proba[1:beg - 1, "rep_length"] <- beg - 1
+  proba[1:beg - 1, "model"] <- 3
+  proba[1, "begin"] <- 1
+  proba[beg - 1, c(4, 7)] <- beg - 1
+  
+  beg <- beg + 1
+  cat("\n      ============ Viterbi is running ============       \n\n")
+  pb <- utils::txtProgressBar(min = beg, max = long, style = 3)
+  for (i in beg:long) {
+    utils::setTxtProgressBar(pb, i)
+    
+    # proba d'avoir la base sous M
+    pM <- trans_pos[which(names(trans_pos) == paste(raw_seq[(i - l_word_pos + 1):i], collapse = ""))] + max(
+      proba[i - 1, "M+"] + trans_mod[1, 1],
+      proba[i - 1, "M-"] + trans_mod[2, 1]
+    )
+    
+    # proba d'avoir la base sous m
+    pm <- trans_neg[which(names(trans_neg) == paste(raw_seq[(i - l_word_neg + 1):i], collapse = ""))] + max(
+      proba[i - 1, "M-"] + trans_mod[2, 2],
+      proba[i - 1, "M+"] + trans_mod[1, 2]
+    )
+    
+    proba[i, "M+"] <- pM
+    proba[i, "M-"] <- pm
+    
+    if (proba[i, "M+"] > proba[i, 2]) {
+      proba[i, "model"] <- 1
+    } else {
+      proba[i, "model"] <- 2
+    }
+    # length information
+    if (proba[i, "model"] == proba[i - 1, "model"]) {
+      proba[i, "length"] <- proba[i - 1, "length"] + 1 # increase part length
+      proba[i - 1, c(4, 7)] <- NA # erase length in previous ligne
+    } else {
+      proba[i, "length"] <- 1 # initiate new part length
+      proba[i - 1, "end"] <- i - 1 # put end value of precedent part
+      proba[c(tmp:(i - 1)), "rep_length"] <- proba[i - 1, "length"] # rep value of length for precedent part
+      proba[i, "begin"] <- tmp <- i # put begin value of the actual part
+    }
+  }
+  close(pb)
+  
+  # closing table
+  proba[i, "end"] <- i # put end value of precedent part
+  proba[c(tmp:(i)), "rep_length"] <- proba[i, "length"] # rep value of length for precedent part
+  
+  # add a column for the line number
+  proba <- cbind(c(1:dim(proba)[1]), proba)
+  colnames(proba)[1] <- "n"
+  
+  return(proba)
+}
+
+
+###################################################
+### code chunk number 8: smoothing
+###################################################
+smoothing <- function(seq,
+                      l_word_pos = 5,
+                      l_word_neg = 4,
+                      smooth_win = 10,
+                      reject_win = 1) {
+  beg <- max(l_word_pos, l_word_neg)
+
+  # finding ambiguous regions which are shorter than a certain windows
+  cat("      ============ Smoothing ============       \n")
+  seq <- cbind(seq, seq[, 4])
+  colnames(seq)[9] <- c("smoothed")
+  seq[which(seq[, "rep_length"] <= smooth_win), "smoothed"] <- 3
+
+  # old version is v1 takes too long
+  # v1 = function(){
+  #   cat("      ============ Smoothing boucle ============       \n")
+  #   pb <- utils::txtProgressBar(min = 1, max = max(seq[, 1]), style = 3)
+  #   for (i in 1:dim(seq)[1]) {
+  #     utils::setTxtProgressBar(pb, i)
+  #     if (seq[i, 6] <= smooth_win) {
+  #       seq[i, "smoothed"] <- 3
+  #     }
+  #   }
+  #   close(pb)
+  # }
+  # v2 = function(){
+  #   seq[which(seq[, 6] <= smooth_win), "smoothed"] <- 3}
+  # system.time(v1())
+  # system.time(v2())
+  
+  # unified ambiguous regions
+  seq <- cbind(seq, seq[, c(5:8)])
+  colnames(seq)[10:13] <- paste("S_", colnames(seq[, c(10:13)]), sep = "")
+
+  seq[beg, "S_length"] <- 1
+  tmp <- seq[beg, c("S_begin", "S_end")] <- beg
+  seq[-c(1:beg), c(10:13)] <- NA
+
+  beg <- beg + 1
+  cat("\n      ============ Smoothing length ============      \n")
+  pb <- utils::txtProgressBar(min = beg - 1, max = dim(seq)[1], style = 3)
+  for (i in beg:dim(seq)[1]) {
+    utils::setTxtProgressBar(pb, i)
+    if (seq[i, "smoothed"] == seq[i - 1, "smoothed"]) {
+      seq[i, "S_length"] <- seq[i - 1, "S_length"] + 1 # increase part length
+      seq[i - 1, c("S_length", "S_end")] <- NA # erase length in previous ligne
+    } else {
+      seq[i, "S_length"] <- 1 # initiate new part length
+      seq[i - 1, "S_end"] <- i - 1 # put end value of precedent part
+      seq[c(tmp:(i - 1)), "S_rep_length"] <- seq[i - 1, "S_length"] # rep value of length for precedent part
+      seq[i, "S_begin"] <- tmp <- i # put begin value of the actual part
+    }
+  }
+  close(pb)
+
+  # closing table
+  seq[i, 13] <- i # put end value of precedent part
+  seq[c(tmp:(i)), 11] <- seq[i, 10] # rep value of length for precedent part
+  
+  # to reject some region and put arbitrary models on them
+  if(reject_win > 1){
+    colnames(seq)[10:13] <- paste("R_", colnames(seq[, c(10:13)]), sep = "")
+    
+    head(seq)
+    
+    cat("      ============ Rejecting ============      \n")
+    # finding regions of length < reject_win between tho regions of same model. Changing the model to surrounding
+    solo_l <-seq[which(seq[,"R_S_length"] %in% unique(seq[, "R_S_rep_length"])),c("smoothed","R_S_rep_length")]
+    for(i in 2:(dim(solo_l)[1]-1)){
+      if(solo_l[i-1,1]==solo_l[i+1,1] && solo_l[i,2] < reject_win && solo_l[i,1] == 3) {solo_l[i,1] <- solo_l[i-1,1]}
+    }
+    
+    seq[,"smoothed"] <- rep(solo_l[,1],solo_l[,2])
+    
+    beg <- beg - 1
+    
+    seq[beg, "R_S_length"] <- 1
+    tmp <- seq[beg, c("R_S_begin", "R_S_end")] <- beg
+    seq[-c(1:beg), c(10:13)] <- NA
+    
+    beg <- beg + 1
+    seq[-c(1:beg), c(10:13)] <- NA
+    cat("\n      ============ Smoothing length after reject ============      \n")
+    pb <- utils::txtProgressBar(min = beg - 1, max = dim(seq)[1], style = 3)
+    for (i in beg:dim(seq)[1]) {
+      utils::setTxtProgressBar(pb, i)
+      if (seq[i, "smoothed"] == seq[i - 1, "smoothed"]) {
+        seq[i, "R_S_length"] <- seq[i - 1, "R_S_length"] + 1 # increase part length
+        seq[i - 1, c("R_S_length", "R_S_end")] <- NA # erase length in previous ligne
+      } else {
+        seq[i, "R_S_length"] <- 1 # initiate new part length
+        seq[i - 1, "R_S_end"] <- i - 1 # put end value of precedent part
+        seq[c(tmp:(i - 1)), "R_S_rep_length"] <- seq[i - 1, "R_S_length"] # rep value of length for precedent part
+        seq[i, "R_S_begin"] <- tmp <- i # put begin value of the actual part
+      }
+    }
+    close(pb)
+    
+    # closing table
+    seq[i, 13] <- i # put end value of precedent part
+    seq[c(tmp:(i)), 11] <- seq[i, 10] # rep value of length for precedent part
+    
+  }
+  
+  return(seq)
+}
+
+
+###################################################
+### code chunk number 9: plot_resume
+###################################################
+graph <- function(seq,colors = c("blue","red","green"),nrow = 3,ycol = 4){
+  par(mfrow = c(nrow,1), mar = c(3,2,1,1))
+  # c(5, 4, 4, 2)
+  
+  long <- max(seq[,1])/nrow
+  for(i in 0:(nrow-1)){
+    plot(x = seq[((1+long*i):(long+long*i)),1],
+         y = seq[((1+long*i):(long+long*i)),ycol],
+         col = colors[seq[((1+long*i):(long+long*i)),9]], xlab = " ", ylab = " ")
+  }
+  par(mfrow = c(1,1))
+}
+
+resume <- function(seq){
+  beg <- seq[which(!is.na(seq[,12])),12] 
+  end <- seq[which(!is.na(seq[,13])),13]
+  long <- seq[which(!is.na(seq[,10])),10]
+  model <- seq[which(!is.na(seq[,10])),9]
+  length(beg) ; length((end)) ; length(long) ; length(model)
+  
+  table <- data.frame(beg,end,long,model)
+  return(table)
+}
+
+
+###################################################
+### code chunk number 10: mus1
+###################################################
+if("mus1.RData" %in% list.files("fig/") && !rerun){
+  load("fig/mus1.RData")
+}else{
+mus1 <- viterbi(file = "../raw_data/mus1.fa",
+  l_word_pos = 5,
+  l_word_neg = 4
+)
+save(mus1,file = "fig/mus1.RData")
+}
+
+mus1 <- smoothing(mus1,5,4,60, 40)
+
+jpeg("fig/mus1_s.jpg", width = 836, height = 496)
+# 2. Create the plot
+graph(mus1,nrow = 3, ycol = 9)
+# 3. Close the file
+dev.off()
+
+mus1_t <- resume(mus1)
+
+matable <- xtable(x = mus1_t , label = "tab:mus1_t")
+# Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
+print(matable, file = "fig/mus1_t.tex",size = "tiny", NA.string = "NA",
+      table.placement = "!t",
+      floating = FALSE,
+      caption.placement="top",
+      include.rownames = TRUE,
+      include.colnames = TRUE,
+      latex.environments = "center")
+
+
+###################################################
+### code chunk number 11: mus2
+###################################################
+if("mus2.RData" %in% list.files("fig/") && !rerun){
+  load("fig/mus2.RData")
+}else{
+mus2 <- viterbi(file = "../raw_data/mus2.fa",
+  l_word_pos = 5,
+  l_word_neg = 4
+)
+save(mus2,file = "fig/mus2.RData")
+}
+
+mus2 <- smoothing(mus2,5,4,60, 40)
+
+jpeg("fig/mus2_s.jpg", width = 836, height = 496)
+# 2. Create the plot
+graph(mus2,nrow = 3, ycol = 9)
+# 3. Close the file
+dev.off()
+
+mus2_t <- resume(mus2)
+
+matable <- xtable(x = mus2_t , label = "tab:mus2_t")
+# Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
+print(matable, file = "fig/mus2_t.tex",size = "tiny", NA.string = "NA",
+      table.placement = "!t",
+      floating = FALSE,
+      caption.placement="top",
+      include.rownames = TRUE,
+      include.colnames = TRUE,
+      latex.environments = "center")
+
+
+###################################################
+### code chunk number 12: mus3
+###################################################
+if("mus3.RData" %in% list.files("fig/") && !rerun){
+  load("fig/mus3.RData")
+}else{
+mus3 <- viterbi(file = "../raw_data/mus3.fa",
+  l_word_pos = 5,
+  l_word_neg = 4
+)
+save(mus3,file = "fig/mus3.RData")
+}
+
+mus3 <- smoothing(mus3,5,4,60, 40)
+
+jpeg("fig/mus3_s.jpg", width = 836, height = 496)
+# 2. Create the plot
+graph(mus3,nrow = 3, ycol = 9)
+# 3. Close the file
+dev.off()
+
+mus3_t <- resume(mus3)
+
+matable <- xtable(x = mus3_t , label = "tab:mus3_t")
+# Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
+print(matable, file = "fig/mus3_t.tex",size = "tiny", NA.string = "NA",
+      table.placement = "!t",
+      floating = FALSE,
+      caption.placement="top",
+      include.rownames = TRUE,
+      include.colnames = TRUE,
+      latex.environments = "center")
+
+
+###################################################
+### code chunk number 13: github_install (eval = FALSE)
 ###################################################
 ## # NOT RUN
 ## library(devtools)
 ## install_github("gowachin/BeeMarkov")
 ## library(BeeMarkov)
-
-
-###################################################
-### code chunk number 8: data_visual (eval = FALSE)
-###################################################
-## icu <- read.delim("../raw_data/icu.txt", header = TRUE)
-## 
-## # transf en facteurs pour mieux analyser
-## icu$LOC[which(icu$LOC == 2)] <- 1
-## 
-## # creating alternative df with factors for binomial variables
-## othr <- data.frame(sapply(icu[, -c(1, 3, 11, 12)], as.factor))
-## icuf <- cbind(icu[, 1], othr, icu[, c(3, 11, 12)])
-## rm(othr)
-## 
-## s <- summary(icuf[, -c(1, 19:21)])
-## s <- as.data.frame(s)
-## s$Freq <- as.character(s$Freq)
-## s <- separate(s, # tibble, dataframe
-##   Freq, # column separated
-##   sep = ":", # separator between columns
-##   into = c("rm", "count"), # names of new variables
-##   remove = TRUE
-## )
-## s <- s[, -c(1, 3)]
-## s$count <- as.numeric(s$count)
-## s$count <- replace_na(s$count, 0)
-## s$l <- 1:dim(s)[1]
-## s <- ddply(s, "Var2", transform, label_count = cumsum(count))
-## s <- s[order(s$l), ]
-## s <- s[, -3]
-## s$label <- as.character(s$count)
-## s$label[which(s$label == "0")] <- ""
-## 
-## visual = ggplot(s, aes(x = Var2,y = count))+
-##   geom_bar(stat = "identity", aes(fill = count), colour="black")+ 
-##   geom_text(aes(y=label_count, label=label), vjust=1.6, 
-##             color="white", size=3.5) +
-##   scale_fill_gradient2(low = "#999999", high = "#E69F00",
-##                        mid = "#56B4E9", midpoint = 100 , name = "Effectif") +
-##   labs(x = "Variables Qualitatives", y = "") +
-##   theme_classic() +
-##   theme(axis.text.x = element_text(angle = 90)) 
-## 
-## ggsave('visual.pdf', plot = visual, device = "pdf", path = 'fig/',scale = 3, width = 7, height = 4, units = "cm", limitsize = T)
-## # sum(is.na(icu)) # no missing data
-## rm(s,visual)
-
-
-###################################################
-### code chunk number 9: quali_cor (eval = FALSE)
-###################################################
-## sampleData <- function(data, percent.calib)
-## {
-##   nCalib = nrow(data) * percent.calib/100
-##   iCalib = sample(1:nrow(data), nCalib)
-##   calib = data[iCalib,] 
-##  # test = data[-iCalib,] 
-##   return(
-##     #list(
-##     calib=calib
-##     #, test=test)
-##     )
-## }
-## 
-## icuvs_1 = sampleData(icu, 70)
-## 
-## qualits_all = colnames(icu[,-c(1,2,3,5,11,12)])
-## 
-## chtest <- function(datas, namesvector) {
-##   m1 <- matrix(
-##     data = NA, nrow = length(namesvector), ncol = length(namesvector), byrow = FALSE,
-##     dimnames = list(namesvector, namesvector)
-##   )
-##   m2 <- matrix(
-##     data = NA, nrow = length(namesvector), ncol = length(namesvector), byrow = FALSE,
-##     dimnames = list(namesvector, namesvector)
-##   )
-## 
-##   for (i in 1:length(namesvector)) {
-##     var1 <- as.matrix(datas[namesvector[i]])
-## 
-##     for (j in which(namesvector != namesvector[i])) {
-##       var2 <- as.matrix(datas[namesvector[j]])
-##       tutu <- chisq.test(table(x = var1, y = var2), simulate.p.value = TRUE)
-##       # cat(namesvector[i], "VS", namesvector[j], "\n");
-##       # print(tutu)
-##       # cat(rep("-", getOption("width"))); cat("\n")
-##       if (tutu$p.value < 0.05) m1[i, j] <- round(tutu$p.value, 4)
-##       m2[i, j] <- tutu$statistic
-##     }
-##   }
-## 
-##   m1[lower.tri(m1)] <- "-"
-##   m1 <- as.data.frame(m1)
-##   m2[lower.tri(m2)] <- "-"
-##   m2 <- as.data.frame(m2)
-##   return(list("pvalues" = m1, "statistics" = m2))
-## }
-## 
-## chtest_all = chtest(icu, qualits_all)
-## 
-## #chall_vs_1 = chtest(icuvs_1$calib, qualits_all)
-## 
-## ##visualisation of all stuff with or without sampling
-## #tibble::as.tibble(cbind.data.frame("names" = rownames(chtest_all[["pvalues"]]),chtest_all[["pvalues"]]))
-## correl = tibble::as.tibble(cbind.data.frame("names" = rownames(chtest_all[["pvalues"]]),chtest_all[["pvalues"]]))
-## 
-## correl = as.data.frame(correl[,-1])
-## rownames(correl) <- colnames(correl)
-## 
-## matable <- xtable(x = correl , label = "quali_cor")
-## # Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
-## print(matable, file = "fig/quali_cor.tex", size = "tiny", NA.string = "NA",
-##       table.placement = "!t",
-##       floating = FALSE,
-##       caption.placement="top",
-##       include.rownames = TRUE,
-##       include.colnames = TRUE,
-##       latex.environments = "center")
-## # On veut des '.' au lieu des des NA
-
-
-###################################################
-### code chunk number 10: quanti_cor (eval = FALSE)
-###################################################
-## quantit <- c("HRA", "SYS")
-## # 1) Check normality -- graphically
-## 
-## # ggqqplot(icu, x = quantit, combine = TRUE) # compares variable distribution with a theoretical normal distr
-## 
-## # 2) Check normality -- test SW
-## hra_shap <- shapiro.test(icu$HRA)
-## sys_shap <- shapiro.test(icu$SYS)
-## # confirmé normalité - on peut faire cor.test sous hypothèse distrib paramétrique (Pearson)
-## var_corelations <- cor(icu[quantit])
-## var_pvalues <- var_corelations ##### pourquoi ces deux lignes?????
-## var_pvalues[] <- NA
-## for (i in (2:nrow(var_corelations))) {
-##   for (j in (1:(i - 1)))
-##   {
-##     # cat("\ncor.test entre",colnames(var_corelations)[i],"et",colnames(var_corelations)[j])
-##     var_pvalues[i, j] <- round(cor.test(icu[, colnames(var_corelations)[i]],
-##       icu[, colnames(var_corelations)[j]],
-##       method = "kendall",
-##       alternative = "two.sided"
-##     )$p.value,
-##     digits = 4
-##     )
-##   }
-## }
-## var_pvalues[2,1] # pas de corrélation significative
-
-
-###################################################
-### code chunk number 11: tri (eval = FALSE)
-###################################################
-## icu = icu[,c(2:4,6,9,11:14,18)]
-
-
-###################################################
-### code chunk number 12: step (eval = FALSE)
-###################################################
-## # sample
-## glmBase_s <- glm(STA ~ 1, data = icuvs_1, family = "binomial")
-## stepwise_s <- stepAIC(glmBase_s, scope = list(
-##   upper = ~ AGE * HRA * SYS * INF * SER * GENDER * PRE * TYP * PCO,
-##   lower = ~1
-## ), direction = "both", trace = F)
-## cat("=================[sample data]=================")
-## stepwise_s
-## 
-## # total
-## glmBase_t <- glm(STA ~ 1, data = icu, family = "binomial")
-## stepwise_t <- stepAIC(glmBase_t, scope = list(
-##   upper = ~ AGE * HRA * SYS * INF * SER * GENDER * PRE * TYP * PCO,
-##   lower = ~1
-## ), direction = "both", trace = F)
-## cat("=================[total data]=================")
-## stepwise_t
-
-
-###################################################
-### code chunk number 13: model_70% (eval = FALSE)
-###################################################
-## # avec les variables choisies par le stepwise: TYP, AGE, SYS, AGE:SYS
-## mod_s = glm(STA ~ AGE + TYP + SYS, data = icuvs_1, family = "binomial")
-## summary(mod_s)
-## anova(mod_s, test = "Chisq")
-## 
-## mod_s1 <- glm(STA ~ AGE, data = icuvs_1, family = "binomial")
-## summary(mod_s1)
-## anova(mod_s1, test = "Chisq")
-## 
-## mod_s2 <- glm(STA ~ SYS, data = icuvs_1, family = "binomial")
-## summary(mod_s2)
-## anova(mod_s2, test = "Chisq")
-## 
-## mod_s3 <- glm(STA ~ TYP, data = icuvs_1, family = "binomial")
-## summary(mod_s3)
-## anova(mod_s3, test = "Chisq")
-## 
-## rs_1 = anova(mod_s, mod_s1, test = "Chisq")
-## rs_2 = anova(mod_s, mod_s2, test = "Chisq")
-## rs_3 = anova(mod_s, mod_s3, test = "Chisq")
-## 
-## results1 = data.frame(
-##   "AGE" = c(rs_1$`Resid. Dev`[2],rs_1$`Resid. Dev`[1]), 
-## "SYS" = c(rs_2$`Resid. Dev`[2],rs_2$`Resid. Dev`[1]), 
-## "TYP" = c(rs_3$`Resid. Dev`[2],rs_3$`Resid. Dev`[1]),
-## row.names = c("Dév. modèle 1 variables", "Dév. modèle 3 variables"))
-## 
-## # pour tout le jeu de données
-## mod = glm(STA ~ AGE + TYP + SYS, data = icu, family = "binomial")
-## summary(mod)
-## anova(mod, test = "Chisq")
-## 
-## mod1 <- glm(STA ~ AGE, data = icu, family = "binomial")
-## summary(mod1)
-## anova(mod1, test = "Chisq")
-## 
-## mod2 <- glm(STA ~ SYS, data = icu, family = "binomial")
-## summary(mod2)
-## anova(mod2, test = "Chisq")
-## 
-## mod3 <- glm(STA ~ TYP, data = icu, family = "binomial")
-## summary(mod3)
-## anova(mod3, test = "Chisq")
-## 
-## r1 = anova(mod, mod1, test = "Chisq")
-## r2 = anova(mod, mod2, test = "Chisq")
-## r3 = anova(mod, mod3, test = "Chisq")
-## 
-## results2 = data.frame(
-##   "AGE" = c(r1$`Resid. Dev`[2],r1$`Resid. Dev`[1]), 
-## "SYS" = c(r2$`Resid. Dev`[2],r2$`Resid. Dev`[1]), 
-## "TYP" = c(r3$`Resid. Dev`[2],r3$`Resid. Dev`[1]),
-## row.names = c("Dév. modèle 1 variables", "Dév. modèle 3 variables"))
-## 
-## 
-## matable <- xtable(x = results1 , label = "result1")
-## # Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
-## print(matable, file = "fig/result1.tex", NA.string = "NA",
-##       table.placement = "!t",
-##       floating = FALSE,
-##       caption.placement="top",
-##       include.rownames = TRUE,
-##       include.colnames = TRUE,
-##       latex.environments = "center")
-## 
-## 
-## matable <- xtable(x = results2 , label = "result2")
-## # Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
-## print(matable, file = "fig/result2.tex", NA.string = "NA",
-##       table.placement = "!t",
-##       floating = FALSE,
-##       caption.placement="top",
-##       include.rownames = TRUE,
-##       include.colnames = TRUE,
-##       latex.environments = "center")
-
-
-###################################################
-### code chunk number 14: validation model 70% (eval = FALSE)
-###################################################
-## # d'abord pour SAMPLE :::::::::::::::::::::::::::::::::::::::::::::::
-## mod_s = glm(STA ~ AGE + TYP + SYS, data = icuvs_1, family = "binomial")
-## 
-## # d'après pdf regression logistique
-## rh1_s = hoslem.test(icuvs_1$STA, fitted(mod_s))
-## 
-## # Analyse des résidus: d'après pdf regression logistique diapo 34 - on confirme distribution normale
-## # mais ça ne sert plus à grande chose à part ça
-## plot(rstudent(mod_s), type = "p", ylim = c(-3,3))
-## abline(h = 2, col = "red")
-## abline(h = -2, col = "red")
-## 
-## 
-## # distance de Cook: y a-t-il des points très influents ? 
-## plot(cooks.distance(mod_s), xlab = "Individus", ylab = "")
-## cooks.distance(mod_s)[cooks.distance(mod_s)>1]
-
-
-###################################################
-### code chunk number 15: performance model 70% (eval = FALSE)
-###################################################
-## library(pROC)
-## # d'abord pour SAMPLE :::::::::::::::::::::::::::::::::::::::::::::::
-## pred.test = predict(mod_s)
-## roc_test = roc(icuvs_1$STA, pred.test)
-## pred.test.bin = ifelse(pred.test>0.5, 1, 0) # transformation en binaire
-## 
-## counting_s = table(icuvs_1$STA, pred.test.bin)
-## 
-## plot(roc_test)
-## auc_s = roc_test$auc # il y a plus de surface en dessous de la courbe: donc plus d'erreurs... étonnant ¬¬
-## 
-## 
-## # puis pour TOUT JEU DONNÉES  :::::::::::::::::::::::::::::::::::::::::::::::
-## pred_tot = predict(mod)
-## roc_tot = roc(icu$STA, pred_tot)
-## pred_tot_bin = ifelse(pred_tot>0.5, 1, 0) # transformation en binaire
-## 
-## counting_t = table(icu$STA, pred_tot_bin)
-## 
-## plot(roc_tot)
-## auc_t = roc_tot$auc
-
-
-###################################################
-### code chunk number 16: model pour 100% et graph (eval = FALSE)
-###################################################
-## # d'abord pour SAMPLE :::::::::::::::::::::::::::::::::::::::::::::::
-## mod_GOOD = glm(STA ~ AGE * SYS + TYP, data = icu, family = "binomial")
-## 
-## # Analyse des résidus: d'après pdf regression logistique diapo 34 - on confirme distribution normale
-## # mais ça ne sert plus à grande chose à part ça
-## plot(rstudent(mod_GOOD), type = "p", ylim = c(-3,3))
-## abline(h = 2, col = "red")
-## abline(h = -2, col = "red")
-## 
-## 
-## # distance de Cook: y a-t-il des points très influents ? non plus
-## plot(cooks.distance(mod_GOOD))
-## cooks.distance(mod_GOOD)[cooks.distance(mod_GOOD)>1]
-## 
-## 
-## # Analyses performance du modèle
-## pred_tot_g = predict(mod_GOOD)
-## roc_tot_g = roc(icu$STA, pred_tot_g)
-## pred_tot_gbin = ifelse(pred_tot_g>0.5, 1, 0) # transformation en binaire
-## 
-## counting_t_g = table(icu$STA, pred_tot_gbin)
-## 
-## plot(roc_tot_g)
-## auc_t_g = roc_tot_g$auc
-## 
-## 
-## #graphique
-## par(mfrow= c(2,1))
-## pred.tot2 = round(pred_tot) # complètement à la rache
-## plot(icu$STA, col = "green", main = "Sans effets croisés")
-## points(pred.tot2, col = "red")
-## 
-## 
-## pred.tot2_g = round(pred_tot_g) # complètement à la rache
-## plot(icu$STA, col = "green", main = "Avec effets croisés")
-## points(pred.tot2_g, col = "red") 
-## # bon... pas terrible
-## 
-
-
-###################################################
-### code chunk number 17: table (eval = FALSE)
-###################################################
-## matable <- xtable(x = summary(icuf[,-c(1,19:21)]) , label = "tset",
-## caption = "Lblablabla")
-## # Notez les doubles \\ nécessaires dans R, c'est la "double escape rule"
-## print(matable, file = "fig/tset.tex", size = "tiny", NA.string = "-")
-## # On veut des '.' au lieu des des NA
 
 
